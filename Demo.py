@@ -8,8 +8,7 @@ Created on Thu Sep 29 12:44:43 2016
 import os
 import sys
 import numpy as np
-from ase.io import read
-from ase.io import write 
+from ase.io import read, write, vasp
 from ase import Atoms
 
 from Cat_structure import Cat_structure
@@ -40,6 +39,7 @@ IGO.site_occs = np.random.randint(low = 0, high = 5, size=IGO.site_locs.shape[0]
 IGO.functionalize()
 
 write(POSCAR_out_fname, IGO.functional_cat, format='xyz')
+#vasp.write_vasp('POSCAR', IGO.functional_cat, vasp5=True, direct=True)
 
 IGO.find_neighbs()
 
