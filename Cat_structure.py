@@ -17,13 +17,27 @@ class Cat_structure:
     
     def __init__(self):
         
+        # Molecular objects
         self.bare_cat = ''               # ASE molecular structure for non-functionalized catalyst
         self.functional_cat = ''               # ASE molecular structure for non-functionalized catalyst
         self.functional_group_list = []         # List of atoms objects of functional groups
+        
+        # Lattice occupancies
         self.site_locs = []             # Cartesian coordinates for occupancy sites
         self.site_occs = []             # list of which functional groups are present at each site
+        self.site_types = []
+        self.func_groups_allowed = []       # list of functional groups allowed to occupy each site type
         self.adj_mat = []
         self.E = 0
+
+    def randomize_occs(self):
+        
+        self.site_occs = [0 for i in range(self.site_locs.shape[0])]
+
+        for occ_ind in range(len(self.site_occs)):
+            allowed_groups = self.func_groups_allowed[self.site_types[occ_ind]]
+            i = np.random.randint(low=0, high=len(allowed_groups))
+            self.site_occs[occ_ind] = allowed_groups[i]
 
     def functionalize(self):            # Need to figure out how to plot in 3-D
 

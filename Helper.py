@@ -26,15 +26,38 @@ class Helper:
     @staticmethod
     def find_bridge(mol_dat, cutoff = 1.6, periodicity = [True, False, False]):
         
+        # Set up symmetry cells
+        x_cells = [0]
+        y_cells = [0]
+        z_cells = [0]        
+        if periodicity[0]:
+            x_cells = [-1,0,1]
+        if periodicity[1]:
+            y_cells = [-1,0,1]
+        if periodicity[2]:
+            z_cells = [-1,0,1]
+        
+        offsets = []
+        for x_cell in x_cells:
+            for y_cell in y_cells:
+                for z_cell in z_cells:
+                    offsets.append([x_cell, y_cell, z_cell])
+
+        # Build bridge site objects
         bridge_sites = Atoms()
         bridge_sites.cell = mol_dat.cell
         
         for atom_ind_1 in range(len(mol_dat.arrays['numbers'])):
             for atom_ind_2 in range(atom_ind_1):
-                dist = np.linalg.norm(mol_dat.positions[atom_ind_1] - mol_dat.positions[atom_ind_2])
-                if dist < cutoff:
-                    bridge_pos = (mol_dat.positions[atom_ind_1] + mol_dat.positions[atom_ind_2]) / 2
-                    bridge_atom = Atoms('S', positions=[bridge_pos])
-                    bridge_sites.extend(bridge_atom)
+                
+                # Test each periodic image of the second atom
+                for offset in offsets:
+                    loc2 = np.dot(offset,bridge_sites.cell) + mol_dat.positions[atom_ind_2]
+                
+                    dist = np.linalg.norm(mol_dat.positions[atom_ind_1] - loc2)
+                    if dist < cutoff:
+                        bridge_pos = (mol_dat.positions[atom_ind_1] + loc2) / 2
+                        bridge_atom = Atoms('S', positions=[bridge_pos])
+                        bridge_sites.extend(bridge_atom)
         
         return bridge_sites
