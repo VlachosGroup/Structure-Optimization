@@ -10,8 +10,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ase.neighborlist import NeighborList
 from ase import Atoms
+import copy
 
 from Helper import Helper
+
+class Pattern:
+    
+    def __init__(self, ads_types = [0], neighbs = []):
+        self.ads_types = ads_types
+        self.adj_mat = np.zeros([len(ads_types), len(ads_types)])
+        
+        for i in range(len(neighbs)):
+            self.adj_mat[ neighbs[i][0]-1 , neighbs[i][1]-1 ] = 1
+            self.adj_mat[ neighbs[i][1]-1 , neighbs[i][0]-1 ] = 1
 
 class Cat_structure:
     
@@ -52,9 +63,8 @@ class Cat_structure:
 
 #        self.functional_cat = Helper.sort_atoms(self.functional_cat)           # sorts atoms by element
     
-    def find_neighbs(self):
+    def find_neighbs(self, nn_dist = 1.6):
         
-        nn_dist = 1.6
         rad_list = nn_dist / 2 * np.ones(len(self.site_occs))
         neighb_list = NeighborList(rad_list, self_interaction=False)
         
@@ -84,5 +94,13 @@ class Cat_structure:
                 
         return np.dot(np.dot(occ1, self.adj_mat), np.transpose(occ2))
     
+    def count_pattern(self, pat):    
+        return 0
+    
     def evaluate_eng(self):
         self.E = 0
+        
+    def mutate(self):
+        rand_site_ind = np.random.randint(low=0, high=len(self.site_occs))
+        allowed_groups = self.func_groups_allowed[self.site_types[rand_site_ind]]
+        self.site_occs[rand_site_ind] = np.random.randint(low=0, high=len(allowed_groups))

@@ -10,14 +10,15 @@ import sys
 import numpy as np
 from ase.io import read, write, vasp
 from ase import Atoms
-from Helper import Helper
 
 from Cat_structure import Cat_structure
+from Helper import Helper
+from Machine_learning import Machine_learning
 
 os.system('cls')
 
 POSCAR_fname = 'graphene.POSCAR'
-POSCAR_out_fname = 'functionalized.xyz'
+POSCAR_out_fname = 'optimized.xyz'
 
 ''' Prepare bare catalyst structure '''
 IGO = Cat_structure()
@@ -44,12 +45,17 @@ IGO.func_groups_allowed = [[0,1,2,5,6], [0,3,4]]
 
 ''' Build IGO site list '''
 IGO.randomize_occs()           # put random functionalities
-IGO.functionalize()
+#IGO.functionalize()
+IGO.find_neighbs()
 
-write(POSCAR_out_fname, IGO.functional_cat, format='xyz')
-#vasp.write_vasp('POSCAR', IGO.functional_cat, vasp5=True, direct=True)
+# Set up and run optimization
+ML = Machine_learning()
+ML.cat_structure = IGO
+ML.patterns = [(0,0), (5,5), (6,6), (5,1), (6,2), (1,1), (2,2), (3,3), (4,4)]
+ML.pattern_engs = [1,1,1,1,1,1,1,1,1]
+ML.Metropolis()
+ML.PlotTrajectory()
 
-#IGO.find_neighbs()
-#
-#print IGO.count_pairs(1, 1)
-#print IGO.count_pairs(1, 3)
+# Print out optimum
+ML.cat_structure.functionalize()
+write(POSCAR_out_fname, ML.cat_structure.functional_cat, format='xyz')
