@@ -44,11 +44,15 @@ IGO.functional_group_list = [hydroxyl_up, hydroxyl_down, epoxy_up, epoxy_down, c
 IGO.func_groups_allowed = [[0,1,2,5,6], [0,3,4]]
 
 ''' Build IGO site list '''
-IGO.randomize_occs()           # put random functionalities
+#IGO.randomize_occs()           # put random functionalities
+IGO.site_occs = [0 for i in range(len(IGO.site_types))]
+IGO.seed_functional_groups(0, [33,8,7,0,0,24,24])
+IGO.seed_functional_groups(1, [129,0,0,4,3,0,0])
+
 #IGO.functionalize()
 IGO.find_neighbs()
-
-# Set up and run optimization
+#
+## Set up and run optimization
 ML = Machine_learning()
 ML.cat_structure = IGO
 ML.patterns = [(0,0), (5,5), (6,6), (5,1), (6,2), (1,1), (2,2), (3,3), (4,4)]

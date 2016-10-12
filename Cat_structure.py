@@ -10,7 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ase.neighborlist import NeighborList
 from ase import Atoms
-import copy
+import random
+from random import shuffle
 
 from Helper import Helper
 
@@ -41,7 +42,7 @@ class Cat_structure:
         self.adj_mat = []
         self.E = 0
 
-    def randomize_occs(self):
+    def randomize_occs(self):           # give each site a random occupancy which it is allowed to have
         
         self.site_occs = [0 for i in range(self.site_locs.shape[0])]
 
@@ -49,6 +50,20 @@ class Cat_structure:
             allowed_groups = self.func_groups_allowed[self.site_types[occ_ind]]
             i = np.random.randint(low=0, high=len(allowed_groups))
             self.site_occs[occ_ind] = allowed_groups[i]
+            
+    def seed_functional_groups(self, site_type, n_each_func_group):
+        
+        new_occs = []
+        for i in range(len(n_each_func_group)):
+            for j in range(n_each_func_group[i]):
+                new_occs.append(i)
+        shuffle(new_occs)
+
+        ind = 0
+        for site_ind in range(len(self.site_occs)):
+            if self.site_types[site_ind] == site_type:
+                self.site_occs[site_ind] = new_occs[ind]
+                ind += 1
 
     def functionalize(self):            # Need to figure out how to plot in 3-D
 
@@ -94,7 +109,7 @@ class Cat_structure:
                 
         return np.dot(np.dot(occ1, self.adj_mat), np.transpose(occ2))
     
-    def count_pattern(self, pat):    
+    def count_pattern(self, pat):
         return 0
     
     def evaluate_eng(self):
@@ -103,4 +118,9 @@ class Cat_structure:
     def mutate(self):
         rand_site_ind = np.random.randint(low=0, high=len(self.site_occs))
         allowed_groups = self.func_groups_allowed[self.site_types[rand_site_ind]]
-        self.site_occs[rand_site_ind] = np.random.randint(low=0, high=len(allowed_groups))
+        self.site_occs[rand_site_ind] = random.choice(allowed_groups)
+        
+    def mutate_CE(self):
+        rand_site_ind = np.random.randint(low=0, high=len(self.site_occs))
+        allowed_groups = self.func_groups_allowed[self.site_types[rand_site_ind]]
+        self.site_occs[rand_site_ind] = random.choice(allowed_groups)
