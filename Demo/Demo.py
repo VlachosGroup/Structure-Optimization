@@ -11,6 +11,7 @@ import numpy as np
 from ase.io import read, write, vasp
 from ase import Atoms
 
+sys.path.insert(0, '../Core')
 from Cat_structure import Cat_structure
 from Helper import Helper
 from Machine_learning import Machine_learning

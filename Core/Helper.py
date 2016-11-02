@@ -57,7 +57,7 @@ class Helper:
                     dist = np.linalg.norm(mol_dat.positions[atom_ind_1] - loc2)
                     if dist < cutoff:
                         bridge_pos = (mol_dat.positions[atom_ind_1] + loc2) / 2
-                        bridge_atom = Atoms('S', positions=[bridge_pos])
+                        bridge_atom = Atoms('Xe', positions=[bridge_pos])
                         bridge_sites.extend(bridge_atom)
         
         return bridge_sites

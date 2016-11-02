@@ -7,7 +7,6 @@ Created on Thu Sep 29 12:42:16 2016
 
 import numpy as np
 #from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
 from ase.neighborlist import NeighborList
 from ase import Atoms
 import random
@@ -115,12 +114,12 @@ class Cat_structure:
     def evaluate_eng(self):
         self.E = 0
         
-    def mutate(self):
+    def mutate(self):       # Change the functional group at a site
         rand_site_ind = np.random.randint(low=0, high=len(self.site_occs))
         allowed_groups = self.func_groups_allowed[self.site_types[rand_site_ind]]
         self.site_occs[rand_site_ind] = random.choice(allowed_groups)
         
-    def mutate_CE(self):
+    def mutate_CE(self):    # Exchange functional groups between adjacent sites of the same type
         rand_site_ind = np.random.randint(low=0, high=len(self.site_occs))
         allowed_groups = self.func_groups_allowed[self.site_types[rand_site_ind]]
         self.site_occs[rand_site_ind] = random.choice(allowed_groups)

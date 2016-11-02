@@ -50,7 +50,7 @@ class Machine_learning:
             
             self.data.append(E)             # record energy
             
-    def PlotTrajectory(self):
+    def PlotTrajectory(self, save = False):
 
         mat.rcParams['mathtext.default'] = 'regular'
         mat.rcParams['text.latex.unicode'] = 'False'
@@ -63,8 +63,16 @@ class Machine_learning:
         plt.xticks(size=20)
         plt.yticks(size=20)
         plt.xlabel('iteration',size=24)
-        plt.ylabel('energy',size=24)   
-        plt.show()
+        plt.ylabel('energy',size=24)
+        ax = plt.subplot(111)        
+        pos = [0.2, 0.15, 0.7, 0.8]
+        ax.set_position(pos)
+        
+        if save:
+            plt.savefig('trajectory.png')
+            plt.close()
+        else:
+            plt.show()
 
 # Use later '''
     
