@@ -1,0 +1,73 @@
+# Energetics for N2 association on Ni/Pt
+  
+energetics
+  
+############################################################################
+  
+cluster AH
+  
+  sites 1
+  lattice_state
+    1 AH*  1
+    
+  variant Ni
+    site_types          Ni
+    graph_multiplicity  1
+    cluster_eng         -0.55
+  end_variant
+  
+  variant Pt
+    site_types          Pt
+    graph_multiplicity  1
+    cluster_eng         -0.3
+  end_variant
+  
+end_cluster
+  
+############################################################################
+
+cluster A
+  
+  sites 1
+  lattice_state
+    1 A*  1
+    
+  variant Ni
+    site_types          Ni
+    graph_multiplicity  1
+    cluster_eng         -0.85
+  end_variant
+  
+  variant Pt
+    site_types          Pt
+    graph_multiplicity  1
+    cluster_eng         -0.7
+  end_variant
+  
+end_cluster
+  
+############################################################################
+
+cluster H
+  
+  sites 1
+  lattice_state
+    1 H*  1
+    
+  variant Ni
+    site_types          Ni
+    graph_multiplicity  1
+    cluster_eng         -0.40
+  end_variant
+  
+  variant Pt
+    site_types          Pt
+    graph_multiplicity  1
+    cluster_eng         -0.40
+  end_variant
+  
+end_cluster
+  
+############################################################################
+
+end_energetics
