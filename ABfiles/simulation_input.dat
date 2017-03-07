@@ -15,7 +15,7 @@ n_surf_species            3
 surf_specs_names          AH* A* H*
 surf_specs_dent           1  1 1
 
-snapshots                 on time 1.11315479E-5
+#snapshots                 on time 1.11315479E-5
 #snapshots                 on event
 process_statistics        on time 1.11315479E-6
 #process_statistics        on event

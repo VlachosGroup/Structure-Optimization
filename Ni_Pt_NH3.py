@@ -104,3 +104,11 @@ class Wei_NH3_model:
         #plt = self.KMC_lat.PlotLattice(plot_neighbs = True)
         #plt.savefig(os.path.join('.', 'lattice.png'))
         #plt.close()
+        
+if __name__ == "__main__":
+
+    x = Wei_NH3_model()
+    x.build_template()
+    x.generate_defected()
+    x.template_to_KMC_lattice()
+    x.show_all()
