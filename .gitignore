@@ -87,3 +87,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+*.png
+*.dat
+*_output.txt
+*.bin

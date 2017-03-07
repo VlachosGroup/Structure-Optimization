@@ -61,12 +61,13 @@ slab_lat.Build_neighbor_list()
 
 # View slab in ASE GUI
 #view(slab)
-write('ase_slab.png', slab)
+#write('ase_slab.png', slab)
 
 # Write lattice_input.dat
 slab_lat.Write_lattice_input()
-
-# Graph the lattice
-plt = slab_lat.PlotLattice(plot_neighbs = True)
-plt.savefig(os.path.join('.', 'lattice.png'))
-plt.close()
+#
+## Graph the lattice
+#plt = slab_lat.PlotLattice(plot_neighbs = True)
+#plt.savefig(os.path.join('.', 'lattice.png'))
+#plt.close()
+#plt.show()
