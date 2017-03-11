@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import copy
 import random
 from shutil import copyfile
+import pickle
 
 from ase.build import fcc100
 from ase.io import read
@@ -44,22 +45,33 @@ class AB_model:
 
 
     ''' Take occupancies and use them to build a defected structure '''
-    def generate_defects(self):    
+    def generate_defects(self, mode = 'rand_cov'):    
         
         self.atoms_defected = copy.deepcopy(self.atoms_template)
-        
-        n_var = 10 * 10
-        n_fixed = 0
-        n_tot = n_var + n_fixed
         
         a_nums = [78 for i in range(len(self.atoms_defected))]
         chem_symbs = ['Pt' for i in range(len(self.atoms_defected))]        
         
-        for i in range(n_fixed, n_tot):
-            if random.uniform(0, 1) < 0.5:
-                a_nums[i] = 28
-                chem_symbs[i] = 'Ni'
-                
+        if mode == 'rand_cov':          # random nickel coverage
+            
+            n_Ni = random.randint(1, 99)
+            Ni_inds = random.sample(range(100), n_Ni)
+            
+            for Ni_ind in Ni_inds:
+                a_nums[Ni_ind] = 28
+                chem_symbs[Ni_ind] = 'Ni'
+        
+        else:                           # all sites randomized independently
+        
+            n_var = 10 * 10
+            n_fixed = 0
+            n_tot = n_var + n_fixed
+            
+            for i in range(n_fixed, n_tot):
+                if random.uniform(0, 1) < 0.5:
+                    a_nums[i] = 28
+                    chem_symbs[i] = 'Ni'
+                    
         self.atoms_defected.set_atomic_numbers(a_nums)
         self.atoms_defected.set_chemical_symbols(chem_symbs)
         
@@ -187,9 +199,10 @@ if __name__ == "__main__":
     
     kmc_source = 'C:\Users\mpnun\Dropbox\Github\Dynamic-Catalyst-Structure\ABfiles'
     run_fldr ='C:\Users\mpnun\Desktop\KMC_runs'
-    n_jobs = 100
+    n_jobs = 94  # change this back to 94
+    n_manual = 6
     zw.FileIO.ClearFolderContents(run_fldr)
-    f_list = [[] for i in range(n_jobs)]    
+    f_list = [[] for i in range(n_jobs + n_manual)]    
     
     for i in range(n_jobs):    
         
@@ -212,6 +225,47 @@ if __name__ == "__main__":
         copyfile(os.path.join(kmc_source, 'energetics_input.dat'), os.path.join(x.path, 'energetics_input.dat'))
         
         f_list[i] = x.fingerprint_counts
+    
+
+    
+    xsd_dir = 'C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents'
+    for i in range(n_manual):
         
+        x = AB_model()
+        x.path = os.path.join(run_fldr, str(n_jobs + i))
+        
+        if not os.path.exists(x.path):
+            os.makedirs(x.path)        
+        
+        
+        
+        x.build_template()
+        x.atoms_defected = read(os.path.join(xsd_dir, 's' + str(i+1) + '.xsd'), format = 'xsd')
+        
+        # Change unit cell to something easier to manage
+        ucell = x.atoms_defected.get_cell()
+        cart_coords = x.atoms_defected.get_positions()
+        l1 = np.linalg.norm(ucell[0,:])
+        l2 = np.linalg.norm(ucell[1,:])
+        l3 = np.linalg.norm(ucell[2,:])
+        new_cell = np.array([[l1, 0, 0], [0, l2, 0], [0, 0, l3]])
+        x.atoms_defected.set_cell(new_cell, scale_atoms=True)
+        
+        x.template_to_KMC_lattice()
+        x.KMC_lattice_to_graph()
+        x.generate_fingerprint_list()
+        x.count_fingerprints()
+        x.show_all()
+        
+        copyfile(os.path.join(kmc_source, 'simulation_input.dat'), os.path.join(x.path, 'simulation_input.dat'))
+        copyfile(os.path.join(kmc_source, 'mechanism_input.dat'), os.path.join(x.path, 'mechanism_input.dat'))
+        copyfile(os.path.join(kmc_source, 'energetics_input.dat'), os.path.join(x.path, 'energetics_input.dat'))
+        
+        f_list[n_jobs + i] = x.fingerprint_counts
+
+    
     f_list = np.array(f_list)
+    with open('f_list.pickle','w') as f:
+        pickle.dump(f_list, f)
+        
     print f_list
