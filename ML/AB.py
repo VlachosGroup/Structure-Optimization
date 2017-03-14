@@ -10,20 +10,32 @@ import random
 from shutil import copyfile
 import pickle
 
-from ase.build import fcc100
-from ase.io import read
-from ase.visualize import view
-from ase.io import write
-from ase import Atoms
+sys.path.append('/home/vlachos/mpnunez/ase')
+import ase
+#from ase.build import fcc100
+#from ase.io import read
+#from ase.visualize import view
+#from ase.io import write
+#from ase import Atoms
 
-import Core.Lattice as lat
-import Core as zw
+sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
+import zacros_wrapper.Lattice as lat
+import zacros_wrapper as zw
+
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
 class AB_model:
     
+    '''
+    Handles a dynamic lattice for a toy chemistry
+    '''
+    
     def __init__(self):
+        
+        '''
+        Initialize class variables
+        '''
         
         self.path = '.'        
         
@@ -41,11 +53,19 @@ class AB_model:
         
     def build_template(self):
     
-        self.atoms_template = fcc100('Pt', size=(10, 10, 1), vacuum=15.0)
+        '''
+        Build template ase atoms object, 1-layer of Pt(100)
+        '''
+    
+        self.atoms_template = ase.build.fcc100('Pt', size=(10, 10, 1), vacuum=15.0)
 
 
-    ''' Take occupancies and use them to build a defected structure '''
-    def generate_defects(self, mode = 'rand_cov'):    
+    
+    def generate_defects(self, mode = 'rand_cov'):
+    
+        '''
+        Create random defects in the structure
+        '''
         
         self.atoms_defected = copy.deepcopy(self.atoms_template)
         
@@ -78,6 +98,10 @@ class AB_model:
     
     def template_to_KMC_lattice(self):
 
+        '''
+        Convert defected atoms object to a KMC lattice object
+        '''
+    
         self.KMC_lat = lat()
         self.KMC_lat.workingdir = self.path
 
@@ -105,6 +129,10 @@ class AB_model:
         
     def KMC_lattice_to_graph(self):
         
+        '''
+        Convert KMC lattice object to a networkx graph object
+        '''
+        
         self.lat_graph = nx.Graph()
         self.lat_graph.add_nodes_from(range(len(self.KMC_lat.site_type_inds)))
         self.lat_graph.add_edges_from(self.KMC_lat.neighbor_list)
@@ -114,6 +142,10 @@ class AB_model:
 
 
     def generate_fingerprint_list(self):
+        
+        '''
+        Generate a list of subgraphs to enumerate
+        '''
         
         self.fingerprint_graphs = [nx.Graph() for i in range(5)]
         
@@ -149,6 +181,10 @@ class AB_model:
     
     def count_fingerprints(self):
         
+        '''
+        Enumerate subgraph isomorphisms
+        '''
+        
         n_fingerprints = len(self.fingerprint_graphs)
         self.fingerprint_counts = [0 for j in range(n_fingerprints)]
         
@@ -173,6 +209,10 @@ class AB_model:
 
     def show_all(self):
     
+        '''
+        Print lattice_input.dat file and other graphs
+        '''
+    
         # View slab in ASE GUI
 #        write('ase_slab.png', self.atoms_defected)
         
@@ -196,6 +236,10 @@ class AB_model:
         
         
 if __name__ == "__main__":
+    
+    '''
+    Generate data for a conceptual example
+    '''
     
     kmc_source = 'C:\Users\mpnun\Dropbox\Github\Dynamic-Catalyst-Structure\ABfiles'
     run_fldr ='C:\Users\mpnun\Desktop\KMC_runs'
@@ -240,7 +284,7 @@ if __name__ == "__main__":
         
         
         x.build_template()
-        x.atoms_defected = read(os.path.join(xsd_dir, 's' + str(i+1) + '.xsd'), format = 'xsd')
+        x.atoms_defected = ase.io.read(os.path.join(xsd_dir, 's' + str(i+1) + '.xsd'), format = 'xsd')
         
         # Change unit cell to something easier to manage
         ucell = x.atoms_defected.get_cell()

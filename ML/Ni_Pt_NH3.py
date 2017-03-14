@@ -17,9 +17,17 @@ from ase import Atoms
 sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper/PythonCode')
 import Core.Lattice as lat
 
-class Wei_NH3_model:
+class Wei_NH3_model:    # We should have Wei_NH3_model and AB_model inherit from a common parent class
+    
+    '''
+    Handles a dynamic lattice for Wei's NH3 decomposition model
+    '''
     
     def __init__(self):
+        
+        '''
+        Set default values for class variables
+        '''
         
         self.atoms_template = []            # will be an ASE atoms object when 
         
@@ -29,6 +37,10 @@ class Wei_NH3_model:
         self.KMC_lat = []               # KMC lattice object
         
     def build_template(self):
+    
+        '''
+        Build a 5-layer Pt(111) slab and transmute the top layer to Ni
+        '''
     
         self.atoms_template = fcc111('Pt', size=(8, 8, 5), vacuum=15.0)
 
@@ -47,8 +59,12 @@ class Wei_NH3_model:
         self.atoms_template.set_chemical_symbols(chem_symbs)
         
         
-    ''' Take occupancies and use them to build a defected structure '''
+    
     def generate_defected(self):    
+        
+        '''
+        Take occupancies and use them to build a defected structure
+        '''
         
         self.atoms_defected = copy.deepcopy(self.atoms_template)
         
@@ -67,6 +83,10 @@ class Wei_NH3_model:
         
     
     def template_to_KMC_lattice(self):
+    
+        '''
+        Convert defected atoms object to a KMC lattice object
+        '''
     
         self.KMC_lat = lat()
 
@@ -94,6 +114,10 @@ class Wei_NH3_model:
         
     def show_all(self):
     
+        '''
+        Print out what you have generated
+        '''
+    
         # View slab in ASE GUI
         write('ase_slab.png', self.atoms_defected)
         
@@ -106,6 +130,10 @@ class Wei_NH3_model:
         #plt.close()
         
 if __name__ == "__main__":
+
+    '''
+    Check to see that our lattice is being built correctly
+    '''
 
     x = Wei_NH3_model()
     x.build_template()

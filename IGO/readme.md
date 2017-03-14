@@ -1,0 +1,1 @@
+Code which functionalizes graphene oxide. Meant to be used for S. Dutta, A. Bohre, G.R. Jenness, W. Zheng, M. Núñez, D.G. Vlachos, B. Saha, “Improved Graphene Oxide for Efficient Solventless C-C Coupling of Low Carbon Furanics to High Carbon Fuel Precursors” ACS Catalysis (submitted)
