@@ -11,21 +11,22 @@ from shutil import copyfile
 import pickle
 
 sys.path.append('/home/vlachos/mpnunez/ase')
-import ase
-#from ase.build import fcc100
-#from ase.io import read
-#from ase.visualize import view
-#from ase.io import write
-#from ase import Atoms
+from ase.build import fcc100
+from ase.io import read
+from ase.visualize import view
+from ase.io import write
+
+import networkx as nx
+import networkx.algorithms.isomorphism as iso
 
 sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
 import zacros_wrapper.Lattice as lat
 import zacros_wrapper as zw
 
-import networkx as nx
-import networkx.algorithms.isomorphism as iso
+from template import dyno_struc
 
-class AB_model:
+
+class AB_model(dyno_struc):
     
     '''
     Handles a dynamic lattice for a toy chemistry
@@ -34,21 +35,10 @@ class AB_model:
     def __init__(self):
         
         '''
-        Initialize class variables
+        Call superclass constructor
         '''
         
-        self.path = '.'        
-        
-        self.atoms_template = []            # will be an ASE atoms object when 
-        
-        self.occupancies = []               # occupancies of different atoms
-        self.atoms_defected = []            # ASE atoms object, like atoms_template, but with atoms missing or transmuted
-        
-        self.KMC_lat = []                   # KMC lattice object
-        self.lat_graph = []                 # networkx graph object
-        
-        self.fingerprint_graphs = []        # networkx graph object, subgraphs to identify and count
-        self.fingerprint_counts = []        # number of each fingerprint present
+        super(AB_model, self).__init__()
         
         
     def build_template(self):
@@ -57,7 +47,7 @@ class AB_model:
         Build template ase atoms object, 1-layer of Pt(100)
         '''
     
-        self.atoms_template = ase.build.fcc100('Pt', size=(10, 10, 1), vacuum=15.0)
+        self.atoms_template = fcc100('Pt', size=(10, 10, 1), vacuum=15.0)
 
 
     
@@ -127,18 +117,7 @@ class AB_model:
         self.KMC_lat.Build_neighbor_list()
         
         
-    def KMC_lattice_to_graph(self):
-        
-        '''
-        Convert KMC lattice object to a networkx graph object
-        '''
-        
-        self.lat_graph = nx.Graph()
-        self.lat_graph.add_nodes_from(range(len(self.KMC_lat.site_type_inds)))
-        self.lat_graph.add_edges_from(self.KMC_lat.neighbor_list)
 
-        for i in range(len(self.KMC_lat.site_type_inds)):
-            self.lat_graph.node[i]['type'] = self.KMC_lat.site_type_names[self.KMC_lat.site_type_inds[i]-1]
 
 
     def generate_fingerprint_list(self):
@@ -179,32 +158,7 @@ class AB_model:
         
     
     
-    def count_fingerprints(self):
-        
-        '''
-        Enumerate subgraph isomorphisms
-        '''
-        
-        n_fingerprints = len(self.fingerprint_graphs)
-        self.fingerprint_counts = [0 for j in range(n_fingerprints)]
-        
-        for i in range(n_fingerprints):
-            
-            # Count subgraphs
-            GM = iso.GraphMatcher(self.lat_graph, self.fingerprint_graphs[i], node_match=iso.categorical_node_match('type','Au'))
-            
-            n_subgraph_isos = 0
-            for subgraph in GM.subgraph_isomorphisms_iter():
-                n_subgraph_isos += 1
-            
-            # Count symmetry of the subgraph
-            GM_sub = iso.GraphMatcher(self.fingerprint_graphs[i], self.fingerprint_graphs[i], node_match=iso.categorical_node_match('type','Au'))            
-            
-            symmetry_count = 0
-            for subgraph in GM_sub.subgraph_isomorphisms_iter():
-                symmetry_count += 1
-                
-            self.fingerprint_counts[i] = n_subgraph_isos / symmetry_count
+
 
 
     def show_all(self):
@@ -241,11 +195,11 @@ if __name__ == "__main__":
     Generate data for a conceptual example
     '''
     
-    kmc_source = 'C:\Users\mpnun\Dropbox\Github\Dynamic-Catalyst-Structure\ABfiles'
-    run_fldr ='C:\Users\mpnun\Desktop\KMC_runs'
+    kmc_source = '/home/vlachos/mpnunez/Github/Dynamic-Catalyst-Structure/ABfiles'
+    run_fldr = '/home/vlachos/mpnunez/ML/test'
     n_jobs = 94  # change this back to 94
     n_manual = 6
-    zw.FileIO.ClearFolderContents(run_fldr)
+    zw.ClearFolderContents(run_fldr)
     f_list = [[] for i in range(n_jobs + n_manual)]    
     
     for i in range(n_jobs):    
@@ -272,7 +226,7 @@ if __name__ == "__main__":
     
 
     
-    xsd_dir = 'C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents'
+    xsd_dir = '/home/vlachos/mpnunez/ML/xsds'
     for i in range(n_manual):
         
         x = AB_model()
@@ -284,7 +238,7 @@ if __name__ == "__main__":
         
         
         x.build_template()
-        x.atoms_defected = ase.io.read(os.path.join(xsd_dir, 's' + str(i+1) + '.xsd'), format = 'xsd')
+        x.atoms_defected = read(os.path.join(xsd_dir, 's' + str(i+1) + '.xsd'), format = 'xsd')
         
         # Change unit cell to something easier to manage
         ucell = x.atoms_defected.get_cell()
@@ -309,7 +263,7 @@ if __name__ == "__main__":
 
     
     f_list = np.array(f_list)
-    with open('f_list.pickle','w') as f:
+    with open(os.path.join(x.path, 'f_list.pickle'),'w') as f:
         pickle.dump(f_list, f)
         
     print f_list

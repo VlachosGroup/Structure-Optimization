@@ -19,9 +19,9 @@
 import os
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('../ML'))
-sys.path.insert(0, os.path.abspath('../../ML'))
-
+sys.path.append('/home/vlachos/mpnunez/Github/Dynamic-Catalyst-Structure/ML')
+sys.path.append('/home/vlachos/mpnunez/ase')
+sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
 
 # -- General configuration ------------------------------------------------
 

@@ -10,6 +10,13 @@ Welcome to Cat structure optimization's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   
+.. automodule:: template
+
+.. autoclass:: dyno_struc
+    :members:
+    
+   
 .. automodule:: AB
 
 .. autoclass:: AB_model

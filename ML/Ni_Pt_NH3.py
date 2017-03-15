@@ -17,7 +17,10 @@ from ase import Atoms
 sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper/PythonCode')
 import Core.Lattice as lat
 
-class Wei_NH3_model:    # We should have Wei_NH3_model and AB_model inherit from a common parent class
+from template import dyno_struc
+
+
+class Wei_NH3_model(dyno_struc):
     
     '''
     Handles a dynamic lattice for Wei's NH3 decomposition model
@@ -26,15 +29,11 @@ class Wei_NH3_model:    # We should have Wei_NH3_model and AB_model inherit from
     def __init__(self):
         
         '''
-        Set default values for class variables
+        Call superclass constructor
         '''
         
-        self.atoms_template = []            # will be an ASE atoms object when 
+        super(Wei_NH3_model, self).__init__()
         
-        self.occupancies = []               # occupancies of different atoms
-        self.atoms_defected = []            # ASE atoms object, like atoms_template, but with atoms missing or transmuted
-        
-        self.KMC_lat = []               # KMC lattice object
         
     def build_template(self):
     
