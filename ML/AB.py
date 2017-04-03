@@ -96,7 +96,6 @@ class AB_model(dyno_struc):
         self.KMC_lat.workingdir = self.path
 
         self.KMC_lat.lattice_matrix = self.atoms_defected.get_cell()[0:2, 0:2]
-        self.KMC_lat.repeat = [1,1]
         self.KMC_lat.site_type_names = ['Pt', 'Ni']
         self.KMC_lat.site_type_inds = [1 for i in range(len(self.atoms_defected))]
         
