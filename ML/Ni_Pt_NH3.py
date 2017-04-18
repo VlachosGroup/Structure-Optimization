@@ -14,6 +14,7 @@ from ase.io import read
 from ase.visualize import view
 from ase.io import write
 from ase import Atoms
+from ase.neighborlist import NeighborList
 
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
@@ -31,6 +32,8 @@ class Wei_NH3_model(dyno_struc):
     Handles a dynamic lattice for Wei's NH3 decomposition model
     Data taken from W. Guo and D.G. Vlachos, Nat. Commun. 6, 8619 (2015).
     '''
+    
+    Pt_Pt_1nn_dist = 2.77       # angstrom
     
     def __init__(self):
         
@@ -90,94 +93,125 @@ class Wei_NH3_model(dyno_struc):
         
         self.occupancies = delete_these
         
-    
+        
     def template_to_KMC_lattice(self):
     
         '''
         Convert defected atoms object to a KMC lattice object
         '''
     
-        # Build lattice for Ni atoms only
-        Ni_lattice = lat()
-        Ni_lattice.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
-        Ni_lattice.site_type_names = ['Ni_occ', 'Ni_vac']
-        Ni_lattice.site_type_inds = [1 for i in range(self.dim1 * self.dim2)]         # Ni atoms for top layer only
+        # Set periodic boundary conditions - periodic in x and y directions, aperiodic in the z direction
+        self.atoms_template.set_pbc([True, True, False])
+        self.atoms_defected.set_pbc([True, True, False])
+        n_at = len(self.atoms_template)
         
-        # Change missing atoms to vacant sites
-        for i in range(len(self.occupancies[ 4 * self.dim1 * self.dim2 : 5 * self.dim1 * self.dim2 : ])):
-            if self.occupancies[4 * self.dim1 * self.dim2 + i]:
-                Ni_lattice.site_type_inds[i] = 2
+        # Find neighbors based on distances
+        rad_list = ( Wei_NH3_model.Pt_Pt_1nn_dist + 0.2) / 2 * np.ones(n_at)               # list of neighboradii for each site
+        neighb_list = NeighborList(rad_list, self_interaction = False)      # set bothways = True to include both ways
+        neighb_list.build(self.atoms_template)
         
-        # Assign coordinates to sites and find neighbors
-        Ni_lattice.set_cart_coords( self.atoms_template.get_positions()[4 * self.dim1 * self.dim2 : 5 * self.dim1 * self.dim2 : , 0:2] )    # x and y coordinates of Ni atoms
-        Ni_lattice.Build_neighbor_list()
-        Ni_lattice.Write_lattice_input()
+        # Build graph
+        mol_graph = nx.Graph()
+        mol_graph.add_nodes_from(range(n_at))       # nodes indexed with integers
+        pos_dict = {}
+        
+        for i in range(n_at):
+            if self.occupancies[i]:
+                mol_graph.node[i]['element'] = 'vacancy'
+            else:
+                mol_graph.node[i]['element'] = self.atoms_template.get_chemical_symbols()[i]
+            mol_graph.node[i]['site_type'] = None
+            pos_dict[i] = self.atoms_template.get_positions()[i,0:2:]
+        
+        # Add edges between adjacent atoms
+        for i in range(n_at):
+            for j in neighb_list.neighbors[i]:
+                mol_graph.add_edge(i, j)
+        
+        # Draw template graph
+        #nx.draw(mol_graph, pos = pos_dict)    
+        #plt.savefig('mol_graph.png')
+        #plt.close()
         
         # Set up object KMC lattice
         self.KMC_lat = lat()
         self.KMC_lat.workingdir = self.path
         self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
-        self.KMC_lat.site_type_names = ['Ni_top', 'Ni_hollow', 'Ni_edge']
+        self.KMC_lat.site_type_names = ['Ni_fcc', 'Ni_hcp', 'Ni_top', 'Ni corner', 'Ni edge', 'Pt_fcc', 'Pt_hcp', 
+            'Pt_top', 'h5', 'f3', 'f4', 'h4', 'h6', 's2', 's1', 'f1', 'f2', 'h1', 'h2']
         
-        # Build networkx graph to help identify sites
-        Ni_graph = dyno_struc.KMC_lattice_to_graph(Ni_lattice)
+        '''
+        Add site types one by one
+        '''
         
-        # Add top sites
-        for i in range(len(Ni_graph)):
-            if Ni_graph.node[i]['type'] == 'Ni_occ':
-                self.KMC_lat.site_type_inds.append(1)
-                self.KMC_lat.cart_coords.append( self.atoms_template.get_positions()[4 * self.dim1 * self.dim2 + i, 0:2:] )
+        # 1. Ni_fcc
         
-        # Add hollow sites
-        Ni_trimer = nx.Graph() 
-        Ni_trimer.add_nodes_from(['A','B','C'])
-        Ni_trimer.add_edges_from([['A','B'], ['B','C'], ['A','C']])
-        Ni_trimer.node['A']['type'] = 'Ni_occ'
-        Ni_trimer.node['B']['type'] = 'Ni_occ'
-        Ni_trimer.node['C']['type'] = 'Ni_occ'
+        # 2. Ni_hcp
         
-        GM = iso.GraphMatcher(Ni_graph, Ni_trimer, node_match=iso.categorical_node_match('type', 'Ni_occ'))
+        # 3. Ni_top
+        for i in range(n_at):
+            if mol_graph.node[i]['element'] == 'Ni':
+                mol_graph.node[i]['site_type'] = 3
+        
+        # 4. Ni corner
+        
+        # 5. Ni edge
+        
+        # 6. Pt_fcc
+        
+        # 7. Pt_hcp 
+        
+        # 8. Pt_top
+        
+        # 9. h5
+        
+        # 10. f3
+        
+        # 11. f4
+        
+        # 12. h4
+        
+        # 13. h6
+        
+        # 14. s2
+        
+        # 15. s1
+        mini_graph = nx.Graph() 
+        mini_graph.add_nodes_from(['A', 'B', 'C', 'D'])
+        mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['A', 'D'], ['B', 'D'], ['C', 'D']])
+        mini_graph.node['A']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'Ni'
+        mini_graph.node['C']['element'] = 'vacancy'
+        mini_graph.node['D']['element'] = 'Pt'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
-            A_ind = inv_map['A']
-            B_ind = inv_map['B']
-            C_ind = inv_map['C']
-            if A_ind < B_ind and B_ind < C_ind:
-                self.KMC_lat.site_type_inds.append(2)
-                
-                A_pos = Ni_lattice.cart_coords[ A_ind , : ]
-                B_pos = Ni_lattice.coord_shift(A_ind, B_ind)
-                C_pos = Ni_lattice.coord_shift(A_ind, C_ind)
-                
-                new_site_pos = ( A_pos + B_pos + C_pos ) / 3
-                self.KMC_lat.cart_coords.append( new_site_pos )
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 15
         
-        # Add edge sites
-        Ni_edge = nx.Graph() 
-        Ni_edge.add_nodes_from(['A','B','C'])
-        Ni_edge.add_edges_from([['A','B'], ['B','C'], ['A','C']])
-        Ni_edge.node['A']['type'] = 'Ni_occ'
-        Ni_edge.node['B']['type'] = 'Ni_occ'
-        Ni_edge.node['C']['type'] = 'Ni_vac'
-        GM2 = iso.GraphMatcher(Ni_graph, Ni_edge, node_match=iso.categorical_node_match('type', 'Ni_occ'))
-        for subgraph in GM2.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            A_ind = inv_map['A']
-            B_ind = inv_map['B']
-            C_ind = inv_map['C']
-            if A_ind < B_ind:
-                self.KMC_lat.site_type_inds.append(3)
-                
-                A_pos = Ni_lattice.cart_coords[ A_ind , : ]
-                B_pos = Ni_lattice.coord_shift(A_ind, B_ind)
-                C_pos = Ni_lattice.coord_shift(A_ind, C_ind)
-                
-                new_site_pos = ( A_pos + B_pos + C_pos ) / 3
-                self.KMC_lat.cart_coords.append( new_site_pos )
+        # 16. f1
         
-        self.KMC_lat.set_cart_coords(np.array(self.KMC_lat.cart_coords))        # Take list of coordinates and make it a vector
-        #self.KMC_lat.Build_neighbor_list()          # Build neighbor list
+        # 17. f2
         
+        # 18. h1
+        
+        # 19. h2
+        
+        '''
+        Finish building KMC lattice
+        '''
+        
+        # All atoms with a defined site type
+        cart_coords_list = []
+        for i in range(n_at):
+            if not mol_graph.node[i]['site_type'] is None:
+                print mol_graph.node[i]['site_type']
+                self.KMC_lat.site_type_inds.append(mol_graph.node[i]['site_type'])
+                cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
+        
+        self.KMC_lat.set_cart_coords(cart_coords_list)
+        
+        #self.KMC_lat.Build_neighbor_list(cut = Wei_NH3_model.Pt_Pt_1nn_dist + 0.2)
         
         
 if __name__ == "__main__":
@@ -203,4 +237,4 @@ if __name__ == "__main__":
     #y.Read_lattice_output('Wei_NH3_lattice_output.txt')
     #plt = y.PlotLattice()
     #plt.savefig('Wei.png')
-    plt.close()
+    #plt.close()
