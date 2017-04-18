@@ -111,9 +111,11 @@ class Wei_NH3_model(dyno_struc):
         # Assign coordinates to sites and find neighbors
         Ni_lattice.set_cart_coords( self.atoms_template.get_positions()[4 * self.dim1 * self.dim2 : 5 * self.dim1 * self.dim2 : , 0:2] )    # x and y coordinates of Ni atoms
         Ni_lattice.Build_neighbor_list()
+        Ni_lattice.Write_lattice_input()
         
         # Set up object KMC lattice
         self.KMC_lat = lat()
+        self.KMC_lat.workingdir = self.path
         self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
         self.KMC_lat.site_type_names = ['Ni_top', 'Ni_hollow', 'Ni_edge']
         
@@ -142,9 +144,15 @@ class Wei_NH3_model(dyno_struc):
             C_ind = inv_map['C']
             if A_ind < B_ind and B_ind < C_ind:
                 self.KMC_lat.site_type_inds.append(2)
-                self.KMC_lat.cart_coords.append( np.mean( self.atoms_template.get_positions()[ [4 * self.dim1 * self.dim2 + A_ind, 4 * self.dim1 * self.dim2 + B_ind, 4 * self.dim1 * self.dim2 + C_ind] , 0:2:], axis=0) )
+                
+                A_pos = Ni_lattice.cart_coords[ A_ind , : ]
+                B_pos = Ni_lattice.coord_shift(A_ind, B_ind)
+                C_pos = Ni_lattice.coord_shift(A_ind, C_ind)
+                
+                new_site_pos = ( A_pos + B_pos + C_pos ) / 3
+                self.KMC_lat.cart_coords.append( new_site_pos )
         
-        ## Add edge sites
+        # Add edge sites
         Ni_edge = nx.Graph() 
         Ni_edge.add_nodes_from(['A','B','C'])
         Ni_edge.add_edges_from([['A','B'], ['B','C'], ['A','C']])
@@ -159,10 +167,16 @@ class Wei_NH3_model(dyno_struc):
             C_ind = inv_map['C']
             if A_ind < B_ind:
                 self.KMC_lat.site_type_inds.append(3)
-                self.KMC_lat.cart_coords.append( np.mean( self.atoms_template.get_positions()[ [4 * self.dim1 * self.dim2 + A_ind, 4 * self.dim1 * self.dim2 + B_ind, 4 * self.dim1 * self.dim2 + C_ind] , 0:2:], axis=0) )
+                
+                A_pos = Ni_lattice.cart_coords[ A_ind , : ]
+                B_pos = Ni_lattice.coord_shift(A_ind, B_ind)
+                C_pos = Ni_lattice.coord_shift(A_ind, C_ind)
+                
+                new_site_pos = ( A_pos + B_pos + C_pos ) / 3
+                self.KMC_lat.cart_coords.append( new_site_pos )
         
         self.KMC_lat.set_cart_coords(np.array(self.KMC_lat.cart_coords))        # Take list of coordinates and make it a vector
-        
+        #self.KMC_lat.Build_neighbor_list()          # Build neighbor list
         
         
         
@@ -171,13 +185,22 @@ if __name__ == "__main__":
     '''
     Check to see that our lattice is being built correctly
     '''
-
+    
+    
     x = Wei_NH3_model()
-    x.build_template()
-    x.generate_defected()
+    x.Load_defect( 'NiPt_template.xsd', 'NiPt_defected.xsd' )
     x.template_to_KMC_lattice()
     
+    x.KMC_lat.Write_lattice_input()     # write lattice_input.dat
+    
+    # Create a png file with the lattice drawn
     plt = x.KMC_lat.PlotLattice()
     plt.savefig(os.path.join(x.path, 'kmc_lattice.png'))
     plt.close()
-    write('defected.xyz', x.atoms_defected, format = 'xyz')
+    
+    # Draw a graph of Wei's lattice
+    #y = lat()
+    #y.Read_lattice_output('Wei_NH3_lattice_output.txt')
+    #plt = y.PlotLattice()
+    #plt.savefig('Wei.png')
+    plt.close()

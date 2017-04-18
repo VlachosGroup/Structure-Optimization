@@ -2,6 +2,8 @@
 Has template class to be inherited from for specific models
 '''
 
+import numpy as np
+
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
@@ -10,6 +12,8 @@ sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
 import zacros_wrapper.Lattice as lat
 import zacros_wrapper as zw
 
+sys.path.append('/home/vlachos/mpnunez/ase')
+from ase.io import read
 
 class dyno_struc(object):
     
@@ -29,7 +33,7 @@ class dyno_struc(object):
         
         self.atoms_template = None            # will be an ASE atoms object when 
         
-        self.occupancies = None               # occupancies of atoms in the ASE atoms object
+        self.occupancies = None               # occupancies of atoms in the ASE atoms object, True if it is changed relative to the template
         self.atoms_defected = None            # ASE atoms object, with some atoms removed or transmuted
         
         self.KMC_lat = None                   # KMC lattice object
@@ -38,6 +42,42 @@ class dyno_struc(object):
         self.fingerprint_graphs = None        # networkx graph object, subgraphs to
         self.fingerprint_counts = None        # number of each fingerprint present
         
+    
+    def Load_defect(self, template_fname, defected_fname, fm = 'xsd'):
+    
+        '''
+        Load the template and defected atoms objects from files
+        Determine the occupancies vector
+        '''
+    
+        self.atoms_template = read(template_fname, format = fm)
+        self.atoms_defected = read(defected_fname, format = fm)
+        
+        self.occupancies = np.array([False for i in range(len(self.atoms_template))])   # Need to find which atoms are missing or changed in the defected structure
+        
+        d_cut = 0.001        # distance cutoff in angstroms
+        for atom_ind in range(len(self.atoms_template)):
+        
+            # Get position and atomic number of the template atom we are trying to find
+            cart_coords = self.atoms_template.get_positions()[atom_ind, :]
+            atomic_num = self.atoms_template.get_atomic_numbers()[atom_ind]
+            
+            defect_ind = 0      # index of defect atom which might be a match
+            dist = 1.0      # distance between atoms we are trying to match
+            
+            match_found = False
+            
+            while (not match_found) and defect_ind < len(self.atoms_defected):
+            
+                defect_coords = self.atoms_defected.get_positions()[defect_ind, :]
+                defect_an = self.atoms_defected.get_atomic_numbers()[defect_ind]
+                dist = np.linalg.norm( cart_coords - defect_coords )
+                match_found = (dist < d_cut) and (defect_an == atomic_num)
+                defect_ind += 1
+                
+            if not match_found:
+                self.occupancies[atom_ind] = True
+            
     
     @staticmethod    
     def KMC_lattice_to_graph(kmc_lat):
