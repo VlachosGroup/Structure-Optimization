@@ -104,6 +104,12 @@ class Wei_NH3_model(dyno_struc):
         self.atoms_template.set_pbc([True, True, False])
         self.atoms_defected.set_pbc([True, True, False])
         n_at = len(self.atoms_template)
+        template_cc = self.atoms_template.get_positions()
+        Ni_z = np.max(template_cc[:,2])
+        bot_lay_z = np.min(template_cc[:,2])
+        Pt_fcc_z = bot_lay_z + 0.25 * (Ni_z - bot_lay_z)
+        Pt_hcp_z = bot_lay_z + 0.50 * (Ni_z - bot_lay_z)
+        Pt_top_z = bot_lay_z + 0.75 * (Ni_z - bot_lay_z)
         
         # Find neighbors based on distances
         rad_list = ( Wei_NH3_model.Pt_Pt_1nn_dist + 0.2) / 2 * np.ones(n_at)               # list of neighboradii for each site
@@ -117,7 +123,12 @@ class Wei_NH3_model(dyno_struc):
         
         for i in range(n_at):
             if self.occupancies[i]:
-                mol_graph.node[i]['element'] = 'vacancy'
+                if self.atoms_template.get_chemical_symbols()[i] == 'Ni':
+                    mol_graph.node[i]['element'] = 'vacancy'
+                elif self.atoms_template.get_chemical_symbols()[i] == 'Cu':
+                    mol_graph.node[i]['element'] = 'vacuum'
+                else:
+                    print 'No element found'
             else:
                 mol_graph.node[i]['element'] = self.atoms_template.get_chemical_symbols()[i]
             mol_graph.node[i]['site_type'] = None
@@ -140,45 +151,128 @@ class Wei_NH3_model(dyno_struc):
         self.KMC_lat.site_type_names = ['Ni_fcc', 'Ni_hcp', 'Ni_top', 'Ni corner', 'Ni edge', 'Pt_fcc', 'Pt_hcp', 
             'Pt_top', 'h5', 'f3', 'f4', 'h4', 'h6', 's2', 's1', 'f1', 'f2', 'h1', 'h2']
         
+        # Prepare a tetrahedron graph which will be useful
+        tet_graph = nx.Graph() 
+        tet_graph.add_nodes_from(['A', 'B', 'C', 'D'])
+        tet_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['A', 'D'], ['B', 'D'], ['C', 'D']])
+        
         '''
         Add site types one by one
         '''
         
         # 1. Ni_fcc
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'Ni'
+        mini_graph.node['C']['element'] = 'Ni'
+        mini_graph.node['D']['element'] = 'vacuum'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 1
         
         # 2. Ni_hcp
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'Ni'
+        mini_graph.node['C']['element'] = 'Ni'
+        mini_graph.node['D']['element'] = 'Pt'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 2
         
         # 3. Ni_top
         for i in range(n_at):
             if mol_graph.node[i]['element'] == 'Ni':
                 mol_graph.node[i]['site_type'] = 3
         
-        # 4. Ni corner
+        
         
         # 5. Ni edge
+        mini_graph = nx.Graph() 
+        mini_graph.add_nodes_from(['A', 'B', 'C'])
+        mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A']])
+        mini_graph.node['A']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'Ni'
+        mini_graph.node['C']['element'] = 'vacancy'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            A_ind = inv_map['A']
+            B_ind = inv_map['B']
+            mol_graph.node[A_ind]['site_type'] = 5
+            mol_graph.node[B_ind]['site_type'] = 5
+        
+        # 4. Ni corner
+        for i in range(n_at):
+            if mol_graph.node[i]['site_type'] == 5 or mol_graph.node[i]['site_type'] == 3:     # look though the neighbors of the Ni fcc sites (1)
+                n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
+                for neighb in mol_graph.neighbors(i):
+                    if mol_graph.node[neighb]['site_type'] == 3 or mol_graph.node[neighb]['site_type'] == 4 or mol_graph.node[neighb]['site_type'] == 5:
+                        n_Ni_neighbs += 1
+                if n_Ni_neighbs <= 3:
+                    mol_graph.node[i]['site_type'] == 4
+
         
         # 6. Pt_fcc
-        
-        # 7. Pt_hcp 
+        for i in range(n_at):
+            if mol_graph.node[i]['element'] == 'vacancy':
+                mol_graph.node[i]['site_type'] = 6
         
         # 8. Pt_top
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['element'] = 'vacancy'
+        mini_graph.node['B']['element'] = 'vacancy'
+        mini_graph.node['C']['element'] = 'vacancy'
+        mini_graph.node['D']['element'] = 'Pt'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 8
+        
+        # 7. Pt_hcp 
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['site_type'] = 8
+        mini_graph.node['B']['site_type'] = 8
+        mini_graph.node['C']['site_type'] = 8
+        mini_graph.node['D']['site_type'] = None
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 7
         
         # 9. h5
         
-        # 10. f3
-        
-        # 11. f4
         
         # 12. h4
         
         # 13. h6
         
-        # 14. s2
-        
-        # 15. s1
-        mini_graph = nx.Graph() 
-        mini_graph.add_nodes_from(['A', 'B', 'C', 'D'])
-        mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['A', 'D'], ['B', 'D'], ['C', 'D']])
+        # 14. s2 and 11. f4
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'Ni'
+        mini_graph.node['C']['element'] = 'vacancy'
+        mini_graph.node['D']['element'] = 'vacuum'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            A_ind = inv_map['A']
+            B_ind = inv_map['B']
+            C_ind = inv_map['C']
+            D_ind = inv_map['D']
+            mol_graph.node[A_ind]['site_type'] = 5
+            mol_graph.node[B_ind]['site_type'] = 5
+            mol_graph.node[C_ind]['site_type'] = 11
+            mol_graph.node[D_ind]['site_type'] = 14
+            
+        # 15. s1 and 10. f3
+        mini_graph = copy.deepcopy(tet_graph)
         mini_graph.node['A']['element'] = 'Ni'
         mini_graph.node['B']['element'] = 'Ni'
         mini_graph.node['C']['element'] = 'vacancy'
@@ -186,16 +280,50 @@ class Wei_NH3_model(dyno_struc):
         GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
+            A_ind = inv_map['A']
+            B_ind = inv_map['B']
             D_ind = inv_map['D']
+            mol_graph.node[A_ind]['site_type'] = 5
+            mol_graph.node[B_ind]['site_type'] = 5
             mol_graph.node[D_ind]['site_type'] = 15
         
-        # 16. f1
+        # 16. f1 and 17. f2
+        for i in range(n_at):
+            if mol_graph.node[i]['site_type'] == 1:     # look though the neighbors of the Ni fcc sites (1)
+                n_edges = 0                 # count the number of neighbors that are Ni edge sites
+                for neighb in mol_graph.neighbors(i):
+                    if mol_graph.node[neighb]['site_type'] == 5 or mol_graph.node[neighb]['site_type'] == 4:
+                        n_edges += 1
+                if n_edges == 1:
+                    mol_graph.node[i]['site_type'] = 17
+                elif n_edges >= 2:
+                    mol_graph.node[i]['site_type'] = 16
         
-        # 17. f2
         
         # 18. h1
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['site_type'] = 3
+        mini_graph.node['B']['site_type'] = 3
+        mini_graph.node['C']['site_type'] = 5
+        mini_graph.node['D']['site_type'] = None
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 18
         
         # 19. h2
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['site_type'] = 3
+        mini_graph.node['B']['site_type'] = 5
+        mini_graph.node['C']['site_type'] = 5
+        mini_graph.node['D']['site_type'] = None
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            D_ind = inv_map['D']
+            mol_graph.node[D_ind]['site_type'] = 19
+        
         
         '''
         Finish building KMC lattice
@@ -205,7 +333,6 @@ class Wei_NH3_model(dyno_struc):
         cart_coords_list = []
         for i in range(n_at):
             if not mol_graph.node[i]['site_type'] is None:
-                print mol_graph.node[i]['site_type']
                 self.KMC_lat.site_type_inds.append(mol_graph.node[i]['site_type'])
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
         
@@ -222,7 +349,8 @@ if __name__ == "__main__":
     
     
     x = Wei_NH3_model()
-    x.Load_defect( 'NiPt_template.xsd', 'NiPt_defected.xsd' )
+    #x.Load_defect( 'NiPt_template.xsd', 'NiPt_defected.xsd' )
+    x.Load_defect( 'new_template.xsd', 'new_defected.xsd' )
     x.template_to_KMC_lattice()
     
     x.KMC_lat.Write_lattice_input()     # write lattice_input.dat
