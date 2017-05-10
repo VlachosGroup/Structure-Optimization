@@ -208,13 +208,13 @@ class Wei_NH3_model(dyno_struc):
         
         # 4. Ni corner
         for i in range(n_at):
-            if mol_graph.node[i]['site_type'] == 5 or mol_graph.node[i]['site_type'] == 3:     # look though the neighbors of the Ni fcc sites (1)
+            if mol_graph.node[i]['site_type'] == 5 or mol_graph.node[i]['site_type'] == 3:     
                 n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
-                for neighb in mol_graph.neighbors(i):
+                for neighb in mol_graph.neighbors(i):               # look though the neighbors of the Ni fcc sites (1)
                     if mol_graph.node[neighb]['site_type'] == 3 or mol_graph.node[neighb]['site_type'] == 4 or mol_graph.node[neighb]['site_type'] == 5:
                         n_Ni_neighbs += 1
                 if n_Ni_neighbs <= 3:
-                    mol_graph.node[i]['site_type'] == 4
+                    mol_graph.node[i]['site_type'] = 4
 
         
         # 6. Pt_fcc
@@ -246,12 +246,25 @@ class Wei_NH3_model(dyno_struc):
             D_ind = inv_map['D']
             mol_graph.node[D_ind]['site_type'] = 7
         
-        # 9. h5
         
         
         # 12. h4
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'vacancy'
+        mini_graph.node['C']['element'] = 'vacancy'
+        mini_graph.node['D']['element'] = 'vacuum'
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            B_ind = inv_map['B']
+            C_ind = inv_map['C']
+            D_ind = inv_map['D']
+            mol_graph.node[B_ind]['site_type'] = 10
+            mol_graph.node[C_ind]['site_type'] = 10
+            mol_graph.node[D_ind]['site_type'] = 12
         
-        # 13. h6
+        
         
         # 14. s2 and 11. f4
         mini_graph = copy.deepcopy(tet_graph)
@@ -262,12 +275,8 @@ class Wei_NH3_model(dyno_struc):
         GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
-            A_ind = inv_map['A']
-            B_ind = inv_map['B']
             C_ind = inv_map['C']
             D_ind = inv_map['D']
-            mol_graph.node[A_ind]['site_type'] = 5
-            mol_graph.node[B_ind]['site_type'] = 5
             mol_graph.node[C_ind]['site_type'] = 11
             mol_graph.node[D_ind]['site_type'] = 14
             
@@ -280,11 +289,7 @@ class Wei_NH3_model(dyno_struc):
         GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
-            A_ind = inv_map['A']
-            B_ind = inv_map['B']
             D_ind = inv_map['D']
-            mol_graph.node[A_ind]['site_type'] = 5
-            mol_graph.node[B_ind]['site_type'] = 5
             mol_graph.node[D_ind]['site_type'] = 15
         
         # 16. f1 and 17. f2
@@ -305,7 +310,7 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['A']['site_type'] = 3
         mini_graph.node['B']['site_type'] = 3
         mini_graph.node['C']['site_type'] = 5
-        mini_graph.node['D']['site_type'] = None
+        mini_graph.node['D']['site_type'] = 2
         GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
@@ -317,7 +322,7 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['A']['site_type'] = 3
         mini_graph.node['B']['site_type'] = 5
         mini_graph.node['C']['site_type'] = 5
-        mini_graph.node['D']['site_type'] = None
+        mini_graph.node['D']['site_type'] = 2
         GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
@@ -325,6 +330,39 @@ class Wei_NH3_model(dyno_struc):
             mol_graph.node[D_ind]['site_type'] = 19
         
         
+        # 9. h5
+        for i in range(n_at):
+            if mol_graph.node[i]['site_type'] == 6:
+                i_pos = self.atoms_template.get_positions()[i,0:2:]
+                s1_in_range = False
+                
+                for j in range(n_at):
+                    if mol_graph.node[j]['site_type'] == 15:
+                        j_pos = self.atoms_template.get_positions()[j,0:2:]
+
+                        if np.linalg.norm( i_pos - j_pos ) < Wei_NH3_model.Pt_Pt_1nn_dist * 2:
+                            s1_in_range = True
+                
+                if s1_in_range:
+                    mol_graph.node[i]['site_type'] = 9
+
+        
+        # 13. h6
+        mini_graph = copy.deepcopy(tet_graph)
+        mini_graph.node['A']['site_type'] = 8
+        mini_graph.node['B']['site_type'] = 8
+        mini_graph.node['C']['site_type'] = None
+        mini_graph.node['D']['site_type'] = None
+        GM = iso.GraphMatcher(mol_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            inv_map = {v: k for k, v in subgraph.items()}
+            A_ind = inv_map['A']
+            D_ind = inv_map['D']
+            if self.atoms_template.get_positions()[D_ind,2] - self.atoms_template.get_positions()[A_ind,2] < -0.1: # lower layer than top Pt
+                mol_graph.node[D_ind]['site_type'] = 13
+                print 'We found an h6 site'
+            
+            
         '''
         Finish building KMC lattice
         '''
@@ -349,8 +387,9 @@ if __name__ == "__main__":
     
     
     x = Wei_NH3_model()
-    #x.Load_defect( 'NiPt_template.xsd', 'NiPt_defected.xsd' )
-    x.Load_defect( 'new_template.xsd', 'new_defected.xsd' )
+    #x.Load_defect( 'new_template.xsd', 'new_defected.xsd' )
+    sys.setrecursionlimit(1500)             # Needed for large number of atoms
+    x.Load_defect( 'template_2.xsd', 'defected_2.xsd' )
     x.template_to_KMC_lattice()
     
     x.KMC_lat.Write_lattice_input()     # write lattice_input.dat
