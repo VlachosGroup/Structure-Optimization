@@ -3,17 +3,25 @@ Has template class to be inherited from for specific models
 '''
 
 import numpy as np
+import os
+import sys
+import copy
+import random
+import time
+import matplotlib.pyplot as plt
+import matplotlib as mat
+import matplotlib.ticker as mtick
+
+sys.path.append('/home/vlachos/mpnunez/ase')
+from ase.io import read
+from ase.io import write
 
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
-import sys
 sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
 import zacros_wrapper.Lattice as lat
-import zacros_wrapper as zw
 
-sys.path.append('/home/vlachos/mpnunez/ase')
-from ase.io import read
 
 class dyno_struc(object):
     
@@ -31,81 +39,78 @@ class dyno_struc(object):
         
         self.path = '.'        
         
-        self.atoms_template = None            # will be an ASE atoms object when 
+        self.ASE_template = None            # will be an ASE atoms object when
+        self.variable_atoms = None                   # indices of the atoms which can be changed
         
-        self.occupancies = None               # occupancies of atoms in the ASE atoms object, True if it is changed relative to the template
-        self.atoms_defected = None            # ASE atoms object, with some atoms removed or transmuted
-        
+        # Data structures for the defected structure
+        self.atoms_missing = None               # atoms_missing of atoms in the ASE atoms object, True if it is changed relative to the template
+        self.ASE_defected = None            # ASE atoms object, with some atoms removed or transmuted
+        self.molecular_NetX = None                 # networkx graph object
         self.KMC_lat = None                   # KMC lattice object
-        self.lat_graph = None                 # networkx graph object
+        self.KMC_NetX = None                 # KMC lattice as a NetworkX graph
         
+        # Input to neural network
         self.fingerprint_graphs = None        # networkx graph object, subgraphs to
         self.fingerprint_counts = None        # number of each fingerprint present
         
     
-    def Load_defect(self, template_fname, defected_fname, fm = 'xsd'):
+    def ASE_to_atoms_missing(self):
     
         '''
-        Load the template and defected atoms objects from files
-        Determine the occupancies vector
+        Determine which atoms in the template are missing in the defected structure
         '''
     
-        self.atoms_template = read(template_fname, format = fm)
-        self.atoms_defected = read(defected_fname, format = fm)
-        
-        self.occupancies = np.array([False for i in range(len(self.atoms_template))])   # Need to find which atoms are missing or changed in the defected structure
+        self.atoms_missing = np.array([False for i in range(len(self.ASE_template))])   # Need to find which atoms are missing or changed in the defected structure
         
         d_cut = 0.001        # distance cutoff in angstroms
-        for atom_ind in range(len(self.atoms_template)):
+        for atom_ind in range(len(self.ASE_template)):
         
             # Get position and atomic number of the template atom we are trying to find
-            cart_coords = self.atoms_template.get_positions()[atom_ind, :]
-            atomic_num = self.atoms_template.get_atomic_numbers()[atom_ind]
+            cart_coords = self.ASE_template.get_positions()[atom_ind, :]
+            atomic_num = self.ASE_template.get_atomic_numbers()[atom_ind]
             
             defect_ind = 0      # index of defect atom which might be a match
             dist = 1.0      # distance between atoms we are trying to match
             
             match_found = False
             
-            while (not match_found) and defect_ind < len(self.atoms_defected):
+            while (not match_found) and defect_ind < len(self.ASE_defected):
             
-                defect_coords = self.atoms_defected.get_positions()[defect_ind, :]
-                defect_an = self.atoms_defected.get_atomic_numbers()[defect_ind]
+                defect_coords = self.ASE_defected.get_positions()[defect_ind, :]
+                defect_an = self.ASE_defected.get_atomic_numbers()[defect_ind]
                 dist = np.linalg.norm( cart_coords - defect_coords )
                 match_found = (dist < d_cut) and (defect_an == atomic_num)
                 defect_ind += 1
                 
             if not match_found:
-                self.occupancies[atom_ind] = True
-            
+                self.atoms_missing[atom_ind] = True
     
-    @staticmethod    
-    def KMC_lattice_to_graph(kmc_lat):
+
+    def atoms_missing_to_ASE(self):
+        
+        '''
+        Use defected graph and template atoms object to generate
+        the atoms object for the defected structure
+        '''
+        
+        self.ASE_defected = copy.deepcopy(self.ASE_template)
+        del self.ASE_defected[self.atoms_missing]        
+        
+     
+    def KMC_lattice_to_graph2D(self):
     
         '''
         Convert KMC lattice object to a networkx graph object
         '''
         
-        nx_graph = nx.Graph()
-        nx_graph.add_nodes_from(range(len(kmc_lat.site_type_inds)))
-        nx_graph.add_edges_from(kmc_lat.neighbor_list)
+        self.KMC_NetX = nx.Graph()
+        self.KMC_NetX.add_nodes_from(range(len(kmc_lat.site_type_inds)))
+        self.KMC_NetX.add_edges_from(kmc_lat.neighbor_list)
 
         for i in range(len(kmc_lat.site_type_inds)):
-            nx_graph.node[i]['type'] = kmc_lat.site_type_names[kmc_lat.site_type_inds[i]-1]
+            self.KMC_NetX.node[i]['type'] = kmc_lat.site_type_names[kmc_lat.site_type_inds[i]-1]
             
-        return nx_graph
-            
-            
-    #def graph_to_KMC_lattice(self, site_coords):
-    #
-    #    '''
-    #    Convert networkx graph object to KMC lattice object
-    #    '''
-    #
-    #    self.KMC_lat = lat()
-        
-        
-    
+
     def count_fingerprints(self):
         
         '''
@@ -118,7 +123,7 @@ class dyno_struc(object):
         for i in range(n_fingerprints):
             
             # Count subgraphs
-            GM = iso.GraphMatcher(self.lat_graph, self.fingerprint_graphs[i], node_match=iso.categorical_node_match('type','Au'))
+            GM = iso.GraphMatcher(self.molecular_NetX, self.fingerprint_graphs[i], node_match=iso.categorical_node_match('type','Au'))
             
             n_subgraph_isos = 0
             for subgraph in GM.subgraph_isomorphisms_iter():
@@ -132,3 +137,181 @@ class dyno_struc(object):
                 symmetry_count += 1
                 
             self.fingerprint_counts[i] = n_subgraph_isos / symmetry_count
+            
+            
+    def optimize(self, ensemble = 'GCE', omega = 1, n_cycles = 1, n_record = 100, n_snaps = 0):
+        
+        '''
+        Use simulated annealing to optimize defects on the surface
+        ensemble: CE (canonical ensemble) or GCE (grand canonical ensemble)
+        omega: Pareto coefficient, 0 optimizes surface energy, 1 optimized activity
+        n_record: number of data snapshots to save in a trajectory
+        n_snaps: number of snapshots to draw
+        '''
+        
+        # Need a variable to control the cooling schedule
+
+        total_steps = n_cycles * len(self.ASE_template)
+        
+        # Initialize variables to record the trajectory
+        step_record = [int( float(i) / (n_record - 1) * ( total_steps ) ) for i in range(n_record)]
+        surf_eng_traj = np.zeros(n_record)        
+        current_traj = np.zeros(n_record)
+        obj_func_traj = np.zeros(n_record)
+        record_ind = 0
+        snap_ind = 0
+        
+        # Initialize list of steps for taking snapshots
+        if n_snaps == 0:
+            snap_record = []
+        elif n_snaps == 1:
+            snap_record = [0]
+        else:
+            snap_record = [int( float(i) / (n_snaps - 1) * ( total_steps ) ) for i in range(n_snaps)]
+        
+        E_form_norm = 1.0
+        curr_norm = -1.0
+        
+        # Evaluate initial structure
+        current = self.eval_current_density()
+        E_form = self.eval_surface_energy()
+        OF = (1.0 - omega) / E_form_norm * E_form + omega / curr_norm * current
+        
+        # Record initial data
+        surf_eng_traj[0] = E_form
+        current_traj[0] = current
+        obj_func_traj[0] = OF
+        record_ind += 1        
+        
+        # Snapshot the initial state
+        self.record_snapshot(snap_ind, record_ind, step_record, surf_eng_traj, current_traj)
+        snap_ind += 1        
+        print 'Printing snapshot ' + str(snap_ind)
+        
+        CPU_start = time.time()        
+        
+        for step in range( total_steps ):
+            
+            # Set temperature
+            Metro_temp = 0.7 * (1 - float(step) / total_steps)
+
+            # Possibly change ensemble and activty-weight for quenching
+            if step > int(total_steps * 0.95):
+                omega = 0
+                Metro_temp = 0
+                ensemble = 'CE'
+            
+            # Record data before changing structure
+            current_prev = current
+            E_form_prev = E_form
+            OF_prev = OF
+            
+            # Do a Metropolis move
+            if ensemble == 'GCE':
+            
+                atom_to_flip = self.get_GCE_ind()
+                self.flip_atom(atom_to_flip)
+                
+            elif ensemble == 'CE':
+                
+                to_from = self.get_CE_inds()
+                self.flip_atom(to_from[0])
+                self.flip_atom(to_from[1])
+                
+            else:
+                raise ValueError(ensemble + ' is not a valid ensemble.')
+                
+            # Evaluate the new structure and determine whether or not to accept
+            current = self.eval_current_density()
+            E_form = self.eval_surface_energy()
+            OF = (1.0 - omega) / E_form_norm * E_form + omega / curr_norm * current
+            
+            if OF - OF_prev < 0:                # Downhill move
+                accept = True
+            else:                               # Uphill move
+                if Metro_temp > 0:              # Finite temperature, may accept uphill moves
+                    accept = np.exp( - ( OF - OF_prev ) / Metro_temp ) > random.random()
+                else:                           # Zero temperature, never accept uphill moves
+                    accept = False
+            
+            # Reverse the change if the move is not accepted
+            if not accept:
+                
+                # Revert the change
+                if ensemble == 'GCE':
+                    self.flip_atom(atom_to_flip)
+                elif ensemble == 'CE':
+                    self.flip_atom(to_from[0])
+                    self.flip_atom(to_from[1])
+                else:
+                    raise ValueError(ensemble + ' is not a valid ensemble.')
+                
+                # Use previous values for evaluations
+                current = current_prev
+                E_form = E_form_prev
+                OF = OF_prev
+            
+            '''
+            Record data and snapshots 
+            '''            
+            
+            # Record data
+            if step+1 in step_record:
+                surf_eng_traj[record_ind] = E_form
+                current_traj[record_ind] = current
+                obj_func_traj[record_ind] = OF
+                record_ind += 1
+            
+            # Record snapshot
+            if step+1 in snap_record:
+                self.record_snapshot(snap_ind, record_ind, step_record, surf_eng_traj, current_traj)
+                snap_ind += 1
+                print 'Printing snapshot ' + str(snap_ind)
+                
+        CPU_end = time.time()
+        print('Time elapsed: ' + str(CPU_end - CPU_start) )
+        
+        
+    def record_snapshot(self, snap_ind, record_ind, step_record, surf_eng_traj, current_traj):
+        
+        '''
+        Draw a double y-axis graph of current density and surface energy vs. optimiztion step
+        '''        
+              
+        
+        mat.rcParams['mathtext.default'] = 'regular'
+        mat.rcParams['text.latex.unicode'] = 'False'
+        mat.rcParams['legend.numpoints'] = 1
+        mat.rcParams['lines.linewidth'] = 2
+        mat.rcParams['lines.markersize'] = 12
+#        mat.rc('xtick', labelsize=20)
+        mat.rc('ytick', labelsize=20) 
+        
+        fig, ax1 = plt.subplots()
+        ax1.plot(step_record[0:record_ind:], surf_eng_traj[0:record_ind:], 'b-')
+        ax1.set_xlabel('Metropolis step', size=24)
+        # Make the y-axis label, ticks and tick labels match the line color.
+        ax1.set_ylabel(r'Surface energy, $\gamma$ (J/m$^2$)', color='b', size=24)
+        ax1.tick_params('y', colors='b', size = 20)
+        plt.xticks( [ step_record[0], step_record[-1] / 4, step_record[-1] / 2, int(0.75 * step_record[-1]), step_record[-1] ] )
+        ax1.set_xlim( [ step_record[0], step_record[-1] ] )
+        #ax1.set_ylim([2.0, 2.4])            # arbitrary bounds set for GIF
+        
+        ax2 = ax1.twinx()
+        ax2.set_xlim( [ step_record[0], step_record[-1] ] )
+        ax2.plot(step_record[0:record_ind:], current_traj[0:record_ind:], 'r-')
+        ax2.set_ylabel(r'Current density, $j$ (mA/cm$^2$)', color='r', size=24)
+        ax2.tick_params('y', colors='r', size=20)
+        #ax2.set_ylim([0, 100])                # arbitrary bounds set for GIF
+        
+        out_fldr = 'opt_movie'
+        fig.tight_layout()
+        plt.savefig(os.path.join(out_fldr, 'opt_graph_' + str(snap_ind) + '.png' ))
+        plt.close()
+                
+        '''
+        Print image of surface
+        '''        
+        
+        self.atoms_missing_to_ASE()
+        write(os.path.join(out_fldr, 'image_defect_' + str(snap_ind) + '.png' ), self.ASE_defected )
