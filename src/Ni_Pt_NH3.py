@@ -112,7 +112,7 @@ class Wei_NH3_model(dyno_struc):
         Pt_top_z = bot_lay_z + 0.75 * (Ni_z - bot_lay_z)
         
         # Find neighbors based on distances
-        rad_list = ( Wei_NH3_model.Pt_Pt_1nn_dist + 0.2) / 2 * np.ones(n_at)               # list of neighboradii for each site
+        rad_list = ( Wei_NH3_model.Pt_Pt_1nn_dist + 0.2) / 2 * np.ones(n_at)               # list of neighbor radii for each site
         neighb_list = NeighborList(rad_list, self_interaction = False)      # set bothways = True to include both ways
         neighb_list.build(self.atoms_template)
         
@@ -122,6 +122,7 @@ class Wei_NH3_model(dyno_struc):
         pos_dict = {}
         
         for i in range(n_at):
+        
             if self.occupancies[i]:
                 if self.atoms_template.get_chemical_symbols()[i] == 'Ni':
                     mol_graph.node[i]['element'] = 'vacancy'
@@ -129,8 +130,10 @@ class Wei_NH3_model(dyno_struc):
                     mol_graph.node[i]['element'] = 'vacuum'
                 else:
                     print 'No element found'
+                    
             else:
                 mol_graph.node[i]['element'] = self.atoms_template.get_chemical_symbols()[i]
+                
             mol_graph.node[i]['site_type'] = None
             pos_dict[i] = self.atoms_template.get_positions()[i,0:2:]
         
@@ -144,12 +147,7 @@ class Wei_NH3_model(dyno_struc):
         #plt.savefig('mol_graph.png')
         #plt.close()
         
-        # Set up object KMC lattice
-        self.KMC_lat = lat()
-        self.KMC_lat.workingdir = self.path
-        self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
-        self.KMC_lat.site_type_names = ['Ni_fcc', 'Ni_hcp', 'Ni_top', 'Ni corner', 'Ni edge', 'Pt_fcc', 'Pt_hcp', 
-            'Pt_top', 'h5', 'f3', 'f4', 'h4', 'h6', 's2', 's1', 'f1', 'f2', 'h1', 'h2']
+        
         
         # Prepare a tetrahedron graph which will be useful
         tet_graph = nx.Graph() 
@@ -360,12 +358,25 @@ class Wei_NH3_model(dyno_struc):
             D_ind = inv_map['D']
             if self.atoms_template.get_positions()[D_ind,2] - self.atoms_template.get_positions()[A_ind,2] < -0.1: # lower layer than top Pt
                 mol_graph.node[D_ind]['site_type'] = 13
-                print 'We found an h6 site'
             
             
         '''
-        Finish building KMC lattice
+        Build KMC lattice
         '''
+        
+        # Set up object KMC lattice
+        self.KMC_lat = lat()
+        self.KMC_lat.workingdir = self.path
+        self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
+        
+        # Wei Nature site names
+        #self.KMC_lat.site_type_names = ['Ni_fcc', 'Ni_hcp', 'Ni_top', 'Ni_corner', 'Ni_edge', 'Pt_fcc', 'Pt_hcp', 
+        #    'Pt_top', 'h5', 'f3', 'f4', 'h4', 'h6', 's2', 's1', 'f1', 'f2', 'h1', 'h2']
+            
+        # Older site names
+        self.KMC_lat.site_type_names = ['fcc_Ni',	'hcp_Ni',	'top_Ni',	'top_corner_Ni',	'top_edge_Ni',	'fcc_Pt',
+        'hcp_Pt',	'top_Pt', 'hcp_2edge_Pt_3fcc',	'fcc_edge_Pt_3fcc',	'fcc_edge_Pt_3hcp',	'hcp_edge_Pt_3fcc',	'hcp_edge_Pt_3hcp',
+            'step_100',	'step_110',	'fcc_edge_Ni_3fcc',	'fcc_edge_Ni_3hcp',	'hcp_edge_Ni_3fcc',	'hcp_edge_Ni_3hcp']
         
         # All atoms with a defined site type
         cart_coords_list = []
@@ -376,7 +387,7 @@ class Wei_NH3_model(dyno_struc):
         
         self.KMC_lat.set_cart_coords(cart_coords_list)
         
-        #self.KMC_lat.Build_neighbor_list(cut = Wei_NH3_model.Pt_Pt_1nn_dist + 0.2)
+        self.KMC_lat.Build_neighbor_list(cut = Wei_NH3_model.Pt_Pt_1nn_dist + 0.1)
         
         
 if __name__ == "__main__":
@@ -392,7 +403,7 @@ if __name__ == "__main__":
     x.Load_defect( 'template_2.xsd', 'defected_2.xsd' )
     x.template_to_KMC_lattice()
     
-    x.KMC_lat.Write_lattice_input()     # write lattice_input.dat
+    x.KMC_lat.Write_lattice_input('.')     # write lattice_input.dat
     
     # Create a png file with the lattice drawn
     plt = x.KMC_lat.PlotLattice()
