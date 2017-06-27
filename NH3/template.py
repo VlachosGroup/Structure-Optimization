@@ -12,14 +12,17 @@ import matplotlib.pyplot as plt
 import matplotlib as mat
 import matplotlib.ticker as mtick
 
-sys.path.append('/home/vlachos/mpnunez/ase')
+#sys.path.append('/home/vlachos/mpnunez/ase')
+sys.path.append('C:\Users\mpnun\Dropbox\Coding\Python_packages\ase')
 from ase.io import read
 from ase.io import write
 
+sys.path.append('C:\Users\mpnun\Dropbox\Coding\Python_packages\networkx')
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
-sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
+#sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
+sys.path.append('C:\Users\mpnun\Dropbox\Github\Zacros-Wrapper')
 import zacros_wrapper.Lattice as lat
 
 
@@ -50,8 +53,9 @@ class dyno_struc(object):
         self.KMC_NetX = None                 # KMC lattice as a NetworkX graph
         
         # Input to neural network
-        self.fingerprint_graphs = None        # networkx graph object, subgraphs to
-        self.fingerprint_counts = None        # number of each fingerprint present
+        self.target_graph = None        # networkx graph object, subgraphs to
+        self.target_isos = None        # list of isomorphisms
+        self.target_mult = None        # networkx graph object, subgraphs to
         
     
     def ASE_to_atoms_missing(self):
@@ -138,7 +142,31 @@ class dyno_struc(object):
                 
             self.fingerprint_counts[i] = n_subgraph_isos / symmetry_count
             
+
+    def count_target(self):
+        
+        '''
+        Find all subgrpah isomorphisms of the target graph in the molecular graph
+        '''        
+ 
+        if self.target_graph is None:
+            raise NameError('Target graph not defined.')
             
+        # Fill a list with the isomorphisms
+        self.target_isos = []
+        GM = iso.GraphMatcher(self.molecular_NetX, self.target_graph, node_match=iso.categorical_node_match('element','Au'))
+        for subgraph in GM.subgraph_isomorphisms_iter():
+            self.target_isos.append(subgraph)
+        
+        # Count symmetry of the subgraph
+        self.target_mult = 0
+        GM_sub = iso.GraphMatcher(self.target_graph, self.target_graph, node_match=iso.categorical_node_match('element','Au'))            
+        for subgraph in GM_sub.subgraph_isomorphisms_iter():
+            self.target_mult += 1
+            
+        # Compute the diameter of the target graph
+        
+        
     def optimize(self, ensemble = 'GCE', omega = 1, n_cycles = 1, n_record = 100, n_snaps = 0):
         
         '''
@@ -173,6 +201,7 @@ class dyno_struc(object):
         curr_norm = -1.0
         
         # Evaluate initial structure
+        self.count_target()
         current = self.eval_current_density()
         E_form = self.eval_surface_energy()
         OF = (1.0 - omega) / E_form_norm * E_form + omega / curr_norm * current
@@ -184,8 +213,8 @@ class dyno_struc(object):
         record_ind += 1        
         
         # Snapshot the initial state
-        self.record_snapshot(snap_ind, record_ind, step_record, surf_eng_traj, current_traj)
-        snap_ind += 1        
+        snap_ind += 1
+        self.record_snapshot(snap_ind, record_ind, step_record, surf_eng_traj, current_traj)  
         print 'Printing snapshot ' + str(snap_ind)
         
         CPU_start = time.time()        
@@ -221,8 +250,11 @@ class dyno_struc(object):
             else:
                 raise ValueError(ensemble + ' is not a valid ensemble.')
                 
-            # Evaluate the new structure and determine whether or not to accept
-            current = self.eval_current_density()
+            '''
+            Evaluate the new structure and determine whether or not to accept
+            '''
+                
+            current = self.eval_current_density()       
             E_form = self.eval_surface_energy()
             OF = (1.0 - omega) / E_form_norm * E_form + omega / curr_norm * current
             
@@ -264,8 +296,8 @@ class dyno_struc(object):
             
             # Record snapshot
             if step+1 in snap_record:
-                self.record_snapshot(snap_ind, record_ind, step_record, surf_eng_traj, current_traj)
                 snap_ind += 1
+                self.record_snapshot(snap_ind, record_ind, step_record, surf_eng_traj, current_traj)                
                 print 'Printing snapshot ' + str(snap_ind)
                 
         CPU_end = time.time()

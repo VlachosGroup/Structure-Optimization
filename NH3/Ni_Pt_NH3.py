@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 import copy
 import random
 
-sys.path.append('/home/vlachos/mpnunez/ase')
+#sys.path.append('/home/vlachos/mpnunez/ase')
+sys.path.append('C:\Users\mpnun\Dropbox\Coding\Python_packages\ase')
 from ase.build import fcc111
 from ase.io import read
 from ase.visualize import view
@@ -17,10 +18,12 @@ from ase.io import write
 from ase import Atoms
 from ase.neighborlist import NeighborList
 
+sys.path.append('C:\Users\mpnun\Dropbox\Coding\Python_packages\networkx')
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
-sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper/zacros_wrapper')
+#sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper/zacros_wrapper')
+sys.path.append('C:\Users\mpnun\Dropbox\Github\Zacros-Wrapper\zacros_wrapper')
 from Lattice import Lattice as lat
 #import zacros_wrapper.Lattice as lat
 
@@ -114,12 +117,11 @@ class Wei_NH3_model(dyno_struc):
         rad_list = ( Wei_NH3_model.Pt_Pt_1nn_dist + 0.2) / 2 * np.ones(n_at)               # list of neighbor radii for each site
         neighb_list = NeighborList(rad_list, self_interaction = False)      # set bothways = True to include both ways
         neighb_list.build(self.ASE_template)
-        
+
         # Build graph
         self.molecular_NetX = nx.Graph()
         self.molecular_NetX.add_nodes_from(range(n_at))       # nodes indexed with integers
         pos_dict = {}                                       # Used to visualize the graph if needed
-        
         self.variable_atoms = []
         
         for i in range(n_at):
@@ -154,17 +156,40 @@ class Wei_NH3_model(dyno_struc):
         If it is a Ni, change it to a vacancy.
         If it is a vacancy, change it to Ni.
         '''        
+        isos_removed = []
+        element_from = self.molecular_NetX.node[ind]['element'] 
         
-        if self.molecular_NetX.node[ind]['element'] == 'vacancy':
+        if element_from == 'vacancy':
+            
             self.molecular_NetX.node[ind]['element'] = 'Ni'
             self.atoms_missing[ind] = False
-        elif self.molecular_NetX.node[ind]['element'] == 'Ni':
-            self.molecular_NetX.node[ind]['element'] == 'vacancy'
+            
+        elif element_from == 'Ni':
+            
+            self.molecular_NetX.node[ind]['element'] = 'vacancy'
             self.atoms_missing[ind] = True
+                
         else:
+            print element_from
             raise NameError('Flipped atoms must be Ni or a vacancy.')
+            
+        # Remove isomorphisms which have site ind as the old property
+        for isom in self.target_isos:
+            if ind in isom:
+                if x.target_graph.node[ isom[ind] ]['element'] == element_from:     # This should always be true because element matching was imposed in the isomorphism
+                    isos_removed.append(isom)
                     
-    
+        for isom in isos_removed:
+            self.target_isos.remove(isom)
+
+        # Add new isomorphisms in a neighborhood around site ind
+        neighb = nx.ego_graph(self.molecular_NetX, ind, radius = 2)         # Take radius around new node # Need the radius to be the diameter of the target graph
+        GM4 = iso.GraphMatcher(neighb, x.target_graph, node_match=iso.categorical_node_match('element','Au') )
+        for subgraph in GM4.subgraph_isomorphisms_iter():
+            if ind in subgraph:
+                self.target_isos.append(subgraph)        
+        
+                    
     def graph3D_to_KMC_lattice(self):
     
         '''
@@ -173,6 +198,8 @@ class Wei_NH3_model(dyno_struc):
         
         if self.molecular_NetX is None:
             raise NameError('Lattice graph not yet defined.')
+        
+        n_at = len(self.ASE_template)        
         
         # Prepare a tetrahedron graph which will be useful
         tet_graph = nx.Graph() 
@@ -420,27 +447,8 @@ class Wei_NH3_model(dyno_struc):
         '''
         Evaluate the objective function
         '''
-    
-        mini_graph = nx.Graph() 
-        mini_graph.add_nodes_from(['A', 'B', 'C', 'D'])
-        mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['B', 'D'], ['C', 'D']])
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'Ni'
-        mini_graph.node['C']['element'] = 'Ni'
-        mini_graph.node['D']['element'] = 'vacancy'
-    
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        OF = 0
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            OF += 1
-            
-        # Count symmetry of the subgraph
-        GM_sub = iso.GraphMatcher(mini_graph, mini_graph, node_match=iso.categorical_node_match('type','Au'))            
-        symmetry_count = 0
-        for subgraph in GM_sub.subgraph_isomorphisms_iter():
-            symmetry_count += 1
-        
-        return OF / symmetry_count
+
+        return len( self.target_isos ) / self.target_mult
         
         
     def eval_surface_energy(self, atom_graph = None, normalize = False):
@@ -460,7 +468,7 @@ class Wei_NH3_model(dyno_struc):
     
         mini_graph = nx.Graph()
         mini_graph.add_nodes_from(['A', 'B'])
-        mini_graph.add_edge(['A','B'])
+        mini_graph.add_edge('A','B')
         mini_graph.node['A']['element'] = 'Ni'
         mini_graph.node['B']['element'] = 'vacancy'
     
@@ -514,6 +522,17 @@ if __name__ == "__main__":
     
     # Build NetworkX graph of the defected structure
     x.atoms_missing_to_graph3D()
+    print x.molecular_NetX
+
+    # Define patterns to find
+    mini_graph = nx.Graph() 
+    mini_graph.add_nodes_from(['A', 'B', 'C', 'D'])
+    mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['B', 'D'], ['C', 'D']])
+    mini_graph.node['A']['element'] = 'Ni'
+    mini_graph.node['B']['element'] = 'Ni'
+    mini_graph.node['C']['element'] = 'Ni'
+    mini_graph.node['D']['element'] = 'vacancy'
+    x.target_graph = mini_graph
     
     # Optimize
     print 'Starting optimization'

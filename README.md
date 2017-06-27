@@ -13,4 +13,4 @@ It is applied to
 
 ### Publications
 - M. Nunez, D.G. Vlachos, "Optimization of transition metal catalyst facet structure: Application to the oxygen reduction reaction" (under review)
-- M. Nunez, D.G. Vlachos, "Catalyst Structure Optimization using Data Driven Model Reduction" (in preparation)
+- M. Nunez, G. Gu., D.G. Vlachos, "Catalyst Structure Optimization using Data Driven Model Reduction" (in preparation)

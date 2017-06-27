@@ -92,3 +92,4 @@ ENV/
 *.dat
 *_output.txt
 *.bin
+*.xsd
