@@ -56,6 +56,7 @@ class dyno_struc(object):
         self.target_graph = None        # networkx graph object, subgraphs to
         self.target_isos = None        # list of isomorphisms
         self.target_mult = None        # networkx graph object, subgraphs to
+        self.target_diam = None
         
     
     def ASE_to_atoms_missing(self):
@@ -165,7 +166,9 @@ class dyno_struc(object):
             self.target_mult += 1
             
         # Compute the diameter of the target graph
-        
+        self.target_diam = nx.algorithms.distance_measures.diameter(self.target_graph)
+        print self.target_diam
+
         
     def optimize(self, ensemble = 'GCE', omega = 1, n_cycles = 1, n_record = 100, n_snaps = 0):
         

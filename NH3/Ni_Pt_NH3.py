@@ -183,7 +183,7 @@ class Wei_NH3_model(dyno_struc):
             self.target_isos.remove(isom)
 
         # Add new isomorphisms in a neighborhood around site ind
-        neighb = nx.ego_graph(self.molecular_NetX, ind, radius = 2)         # Take radius around new node # Need the radius to be the diameter of the target graph
+        neighb = nx.ego_graph(self.molecular_NetX, ind, radius = self.target_diam)         # Take radius around new node
         GM4 = iso.GraphMatcher(neighb, x.target_graph, node_match=iso.categorical_node_match('element','Au') )
         for subgraph in GM4.subgraph_isomorphisms_iter():
             if ind in subgraph:
