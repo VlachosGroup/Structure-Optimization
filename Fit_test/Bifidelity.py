@@ -7,17 +7,14 @@ Created on Tue Jun 27 14:03:35 2017
 
 import numpy as np
 import random
+import os
 
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
-
-from genetic import *
 
 def Ackley(x):
     
     '''
+    Ackley function
     x is an n-dimensional vector
     '''
     
@@ -27,51 +24,13 @@ def Ackley(x):
 
 def simple_OF(x):
     
+    '''
+    Very simply objective function for testing purposes
+    '''    
+    
     return np.sqrt( ( x[0] + 1 ) ** 2 + (x[1] - 2 ) ** 2 )
 
     
-def plot_Ackley():
-    
-    '''
-    Plot the objective function. It would be better to do this in 2-D with colors...
-    '''    
-    
-    # Make data.
-    x1min = -4
-    x1max = 4
-    x2min = -4
-    x2max = 4
-    
-    X = np.arange(x1min, x1max, 0.25)
-    Y = np.arange(x2min, x2max, 0.25)
-    X, Y = np.meshgrid(X, Y)
-
-    Z = np.zeros([ X.shape[0], X.shape[1] ])
-    for i in range(len(X)):
-        for j in range(len(Y)):
-#            Z[i,j] = Ackley( np.array([ X[i,j] , Y[i,j] ]) )
-            Z[i,j] = simple_OF( np.array([ X[i,j] , Y[i,j] ]) )
-    
-    # Plot the surface.
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-    plt.xlabel(r'$x_1$', size = 24)
-    plt.ylabel(r'$x_2$', size = 24)
-    plt.xticks(size=24)
-    plt.yticks(size=24)
-#    plt.zlabel('Value')    
-    
-    # Customize the z axis.
-#    ax.set_zlim(-1.01, 1.01)
-    ax.zaxis.set_major_locator(LinearLocator(10))
-    ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    
-    # Add a color bar which maps values to colors.
-    fig.colorbar(surf, shrink=0.5, aspect=5)
-    
-    plt.show()
-
 def rand_indiv():
     
     '''
@@ -81,21 +40,23 @@ def rand_indiv():
     return [ -4. + random.random() * 8. for i in xrange(2) ] 
  
 
-def evolve(pop, retain=0.2, random_select=0.1, mutate=0.1):
+def evolve(pop, retain=0.2, random_select=0.1, mutate=0.1, controlled = False):
     
     '''
     Evolve the population using metation and crossover
     retain: top fraction to keep
     random_select: 
     mutate: 
+    controlled: If True evaluate the full model and refine the neural network
+                If false use the neural network
     '''    
     
-    graded = [ [ simple_OF(x), x[0], x[1] ] for x in pop]
+    graded = [ [ Ackley(x), x[0], x[1] ] for x in pop]
     graded = sorted(graded)
     sorted_pop = [ [ x[1], x[2] ] for x in graded]    
     scores = np.array( [ x[0] for x in graded] )
-    print '\nBest score: ' + str(scores[0])
-    print 'Average score: ' + str(np.mean(scores))
+#    print '\nBest score: ' + str(scores[0])
+#    print 'Average score: ' + str(np.mean(scores))
     
     retain_length = int(len(pop) * retain)
     new_pop = sorted_pop[:retain_length]            # Take the bottom scores
@@ -129,17 +90,39 @@ def evolve(pop, retain=0.2, random_select=0.1, mutate=0.1):
 def plot_pop(p, fname = None):
     
     '''
+    Plot a heat map of the objective function
+    '''     
+    
+    plt.figure() 
+    # Make data.
+    x1min = -4
+    x1max = 4
+    x2min = -4
+    x2max = 4
+    
+    X = np.arange(x1min, x1max, 0.25)
+    Y = np.arange(x2min, x2max, 0.25)
+    X, Y = np.meshgrid(X, Y)
+
+    Z = np.zeros([ X.shape[0], X.shape[1] ])
+    for i in range(len(X)):
+        for j in range(len(Y)):
+            Z[i,j] = Ackley( np.array([ X[i,j] , Y[i,j] ]) )
+#            Z[i,j] = simple_OF( np.array([ X[i,j] , Y[i,j] ]) )
+            
+    plt.contourf(X, Y, Z, 15, cmap=plt.cm.rainbow, vmax=Z.max(), vmin=Z.min())
+    plt.colorbar()
+    
+    
+    '''
     Plot the values of each individual in the population
     '''    
     
-#    print len(p)
-#    for ind in p:
-#        print ind
     x1_vec = [ind[0] for ind in p]
     x2_vec = [ind[1] for ind in p]
-    plt.figure()
-    plt.plot(x1_vec, x2_vec, marker='o', color = 'b', linestyle = 'None')       # population
-    plt.plot(-1, 2, marker='x', color = 'r', linestyle = 'None')                # target
+    
+    plt.plot(x1_vec, x2_vec, marker='o', color = 'k', linestyle = 'None')       # population
+#    plt.plot(-1, 2, marker='x', color = 'r', linestyle = 'None')                # target
     plt.xlabel('$x_1$',size=24)
     plt.ylabel('$x_2$',size=24)
     plt.xticks(size=20)
@@ -155,18 +138,50 @@ def plot_pop(p, fname = None):
         plt.close()
     
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     
-    # Track the number of evaluations of the Ackley function
-    # Plot the objective function as a heat map
+    os.system('cls')
+     
+    
+    '''
+    Generate initial training data
+    '''
+    
+    x1min = -4
+    x1max = 4
+    x2min = -4
+    x2max = 4
+    
+    n_X1 = 20
+    n_X2 = 20
+    
+    X1 = np.linspace(x1min, x1max, n_X1)
+    X2 = np.linspace(x2min, x2max, n_X2)
+    X1, X2 = np.meshgrid(X1, X2)
+    X1 = X1.reshape([ n_X1 * n_X2 ])
+    X2 = X2.reshape([ n_X1 * n_X2 ])
+    X = np.vstack( [X1, X2] )
+    X = np.transpose(X)
+    
+    Y = np.zeros([ X.shape[0] ])
+    for i in range( X.shape[0] ):
+        Y[i] = Ackley( X[i,:] )
+#    
+    
+    
+    
+    
+    
+    # Numerical parameters
+    p_count = 100       # population size    
+    n_gens = 100        # number of generations
     
     # Initialize population
-    p_count = 100       # population size
     p = [ rand_indiv() for x in xrange(p_count) ]
     
     plot_pop(p, fname = 'pop_pic_0.png')
    
-    for i in xrange(100):
+    for i in xrange(n_gens):
         p = evolve(p)
         
         if i % 10 == 0:
