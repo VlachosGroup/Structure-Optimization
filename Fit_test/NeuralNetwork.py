@@ -12,7 +12,7 @@ import copy
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error # don't judge me for being lazy
+from sklearn.metrics import mean_squared_error
 
 
 class NeuralNetwork():
@@ -29,37 +29,30 @@ class NeuralNetwork():
         '''
         Compute value for the model as trained so far
         '''
-        
-        return self.NNModel.predict(x)
+
+        return self.NNModel.predict( np.array( [ x ] ) )[0]
     
     
     def refine(self, X_plus, Y_plus):
         
         '''
         Add new data to the training set and retrain
+        X_plus and Y_plus need to be 2-D matrices of data
         '''
         
+        # Append to existing data sets
         if self.X is None or self.Y is None:
-            
             self.X = X_plus
             self.Y = Y_plus
-            
         else:
-            
-            if len(self.X.shape) == 1:
-                self.X = np.hstack( [ self.X , X_plus ] )
-            else:
-                self.X = np.vstack( [ self.X , X_plus ] )
-                
-            if len(self.Y.shape) == 1:
-                self.Y = np.hstack( [ self.Y , Y_plus ] )
-            else:
-                self.Y = np.vstack( [ self.Y , Y_plus ] )
-                
+            self.X = np.vstack( [ self.X , X_plus ] )
+            self.Y = np.vstack( [ self.Y , Y_plus ] )
+        
+        # Regress the neural network
         self.train()
 
 
-    def train(self):
+    def train(self, regularization_parameter = 0.1):
 
         '''
         Train the neural network with the available data
@@ -72,15 +65,14 @@ class NeuralNetwork():
         User Input
         '''
         # data scaling: involves centering and standardizing data
-        Data_scaling = True
+#        Data_scaling = True
+        Data_scaling = False
         
         # Train:test split cross validation set up
         test_set_size = 0.2
-        output_path = os.path.abspath('Neural_net_out.txt')
         
         # Neural network set up
         hidden_layer_sizes = (5,) # (#perceptons in layer 1, #perceptons in layer 2, #perceptons in layer 3, ...)
-        regularization_parameters = np.logspace(-8, 3, num=100)
 
         '''
         Scale Data
@@ -112,22 +104,9 @@ class NeuralNetwork():
         
         ## Split Data
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_set_size, random_state=1)
+            
+        ## Build Model
+        self.NNModel = MLPRegressor(solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
         
-        # output
-        f = open(output_path,'w')
-        for i in xrange(0,len(regularization_parameters)):
-            
-            ## Build Model
-            NNModel = MLPRegressor(solver = 'lbfgs', alpha = regularization_parameters[i], hidden_layer_sizes = hidden_layer_sizes)
-            
-            ## Fit
-            NNModel.fit(X_train, Y_train)
-            
-            ## Predict test set
-            Y_test_predicted = NNModel.predict(X_test)
-            
-            ## Compute mean square error
-            f.write( '%.5e\t%.5e\n'%(regularization_parameters[i], mean_squared_error(Y_scaler.inverse_transform(Y_test), 
-                                     Y_scaler.inverse_transform(Y_test_predicted))))
-            
-        f.close()
+        ## Fit
+        self.NNModel.fit(X_train, Y_train)

@@ -12,5 +12,6 @@ It is applied to
 [Zacros-Wrapper](https://github.com/VlachosGroup/Zacros-Wrapper) : Used to build the lattice and run KMC simulations for NH3 decomposition.
 
 ### Publications
+
 - M. Nunez, D.G. Vlachos, "Optimization of transition metal catalyst facet structure: Application to the oxygen reduction reaction" (under review)
 - M. Nunez, G. Gu., D.G. Vlachos, "Catalyst Structure Optimization using Data Driven Model Reduction" (in preparation)
