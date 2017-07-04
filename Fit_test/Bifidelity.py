@@ -5,6 +5,8 @@ Created on Tue Jun 27 14:03:35 2017
 @author: mpnun
 """
 
+# Replicating the approach of Y. Jin, S. Member, M. Olhofer, and B. Sendhoff, IEEE Trans. Evol. Comput. 6, 481 (2002).
+
 import numpy as np
 import random
 import os
@@ -30,15 +32,17 @@ class Bifidelity():
         self.training_X = None              # Set of training structures used to regress the low fidelity model
         self.training_Y = None              # Training output
         self.low_fid = None                 # Low fidelity model trained with data
+        self.high_fid_calls = 0
 
         if not pop_size is None:
             self.initialize_pop( pop_size )
 
 
-    def eval_OF(self, x, fidelity = 'high'):
+    def eval_OF(self, x, fidelity = 'high', count_call = True):
         
         '''
         Evaluate the objective function for an individual by calling either the high or low fidelity model
+        count_call: Keeps track of how many times evaluation has been done, can be set to False for graphing
         '''
         
         if fidelity == 'high':
@@ -48,6 +52,8 @@ class Bifidelity():
             x is an n-dimensional vector
             '''
             
+            if count_call:
+                self.high_fid_calls += 1
             y = np.array(x)
             return -20 * np.exp( -0.2 * np.sqrt( np.mean( y ** 2 ) ) ) - np.exp( np.mean( np.cos( 2 * np.pi * y ) ) ) + 20 + np.e
 
@@ -105,10 +111,7 @@ class Bifidelity():
         for i in xrange(n_gens):
 
             # Evolve population
-            if i > 0 and i % controlled_every == 0:
-                self.evolve(controlled = True)
-            else:
-                self.evolve(controlled = False)
+            self.evolve(controlled = (i > 0 and i % controlled_every == 0), sigma = 1.2 * ( 1 - float(i) / n_gens ) )
             
             # Show the population if it is a snapshot generation
             if i+1 in snap_record:
@@ -116,7 +119,7 @@ class Bifidelity():
                 self.plot_pop(fid = 'low', fname = 'pop_pic_' + str(snap_ind) + '.png' , gen_num = i+1)          
             
 
-    def evolve(self, retain=0.2, random_select=0.1, mutate=0.1, controlled = False):
+    def evolve(self, retain=0.2, random_select=0.1, mutate=0.3, sigma = 1., controlled = False):
     
         '''
         Execute one generation of the genetic algorithm
@@ -157,8 +160,8 @@ class Bifidelity():
         for individual in new_pop:
             if mutate > random.random():
 #                print individual
-                individual[0] = individual[0] + random.gauss(0, 0.5)    # Add Gaussian noise
-                individual[1] = individual[1] + random.gauss(0, 0.5)    # Add Gaussian noise
+                individual[0] = individual[0] + random.gauss(0, sigma)    # Add Gaussian noise
+                individual[1] = individual[1] + random.gauss(0, sigma)    # Add Gaussian noise
           
         # Crossover parents to create children    
         desired_length = len(self.pop) - len(new_pop)
@@ -195,7 +198,7 @@ class Bifidelity():
         Z = np.zeros([ X.shape[0], X.shape[1] ])
         for i in range(len(X)):
             for j in range(len(Y)):
-                Z[i,j] = self.eval_OF( [ X[i,j] , Y[i,j] ], fidelity = fid )
+                Z[i,j] = self.eval_OF( [ X[i,j] , Y[i,j] ], fidelity = fid, count_call = False )
                 
 #        plt.contourf(X, Y, Z, 15, cmap=plt.cm.rainbow, vmax=Z.max(), vmin=Z.min())
         plt.contourf(X, Y, Z, 15, cmap=plt.cm.rainbow, vmax=13, vmin=0)
@@ -235,16 +238,21 @@ if __name__ == "__main__":
     
     os.system('clear')
     
-    BF = Bifidelity(pop_size = 10) 
-    BF.low_fid = NeuralNetwork()
+    # Numerical parameters
+    p_count = 10                   # population size    
+    n_gens = 100                    # number of generations
+    fc = 0.1           # fraction of generations that are controlled
     
+    BF = Bifidelity(pop_size = p_count) 
+    BF.low_fid = NeuralNetwork()
+
     '''
     Generate initial training data
     '''
     
-    x1min = -4
+    x1min = 2
     x1max = 4
-    x2min = -4
+    x2min = 2
     x2max = 4
     
     n_X1 = 4
@@ -255,8 +263,6 @@ if __name__ == "__main__":
     X1, X2 = np.meshgrid(X1, X2)
     X1 = X1.reshape(-1,1)
     X2 = X2.reshape(-1,1)
-#    X1 = X1.reshape([ n_X1 * n_X2 ])
-#    X2 = X2.reshape([ n_X1 * n_X2 ])
     X = np.hstack( [X1, X2] )
     
     Y = np.zeros([ X.shape[0], 1 ])
@@ -268,16 +274,12 @@ if __name__ == "__main__":
     BF.low_fid.refine(X, Y)
     BF.plot_pop(fname = 'high_fid.png', fid = 'high')
     BF.plot_pop(fname = 'low_fid.png', fid = 'low')
+    print str(BF.high_fid_calls) + ' high fidelity calls'
 
-    
     '''
     Create model and execute genetic algorithm
     '''
 
-    # Numerical parameters
-    p_count = 100                   # population size    
-    n_gens = 100                    # number of generations
-    fc = 0.1           # fraction of generations that are controlled
-
+    BF.genetic_algorithm(n_gens, frac_controlled = fc, n_snaps = 10)
     
-    BF.genetic_algorithm(n_gens, frac_controlled = 0.1, n_snaps = 10)
+    print str(BF.high_fid_calls) + ' high fidelity calls'

@@ -516,14 +516,13 @@ if __name__ == "__main__":
     else:
     
         # Read structures from xsd files
-        x.ASE_template = read(os.path.join('External', 'template_2.xsd') , format = 'xsd')
-        x.ASE_defected = read(os.path.join('External', 'defected_2.xsd') , format = 'xsd')
+        x.ASE_template = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\NiPt_template.xsd', format = 'xsd')
+        x.ASE_defected = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\defected_4.xsd', format = 'xsd')
         x.ASE_to_atoms_missing()
     
     # Build NetworkX graph of the defected structure
     x.atoms_missing_to_graph3D()
-    print x.molecular_NetX
-
+    '''
     # Define patterns to find
     mini_graph = nx.Graph() 
     mini_graph.add_nodes_from(['A', 'B', 'C', 'D'])
@@ -539,16 +538,16 @@ if __name__ == "__main__":
     x.optimize(n_snaps = 10)
     x.atoms_missing_to_ASE()
     write( os.path.join('External', 'optimized.png') , x.ASE_defected )
-    
+    '''
     # Generate KMC lattice
-    #x.graph3D_to_KMC_lattice()
-    #x.KMC_lattice_to_graph2D()
+    x.graph3D_to_KMC_lattice()
+#    x.KMC_lattice_to_graph2D()
     
     '''
     Write output
     '''
     
-    #x.KMC_lat.Write_lattice_input('.')     # write lattice_input.dat
+    x.KMC_lat.Write_lattice_input('C:\Users\mpnun\Desktop')     # write lattice_input.dat
     #
     ## Draw lattice in a png file
     #plt = x.KMC_lat.PlotLattice()

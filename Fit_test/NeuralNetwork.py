@@ -72,7 +72,7 @@ class NeuralNetwork():
         test_set_size = 0.2
         
         # Neural network set up
-        hidden_layer_sizes = (5,) # (#perceptons in layer 1, #perceptons in layer 2, #perceptons in layer 3, ...)
+        hidden_layer_sizes = (20,) # (#perceptons in layer 1, #perceptons in layer 2, #perceptons in layer 3, ...)
 
         '''
         Scale Data
@@ -106,7 +106,7 @@ class NeuralNetwork():
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_set_size, random_state=1)
             
         ## Build Model
-        self.NNModel = MLPRegressor(solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
+        self.NNModel = MLPRegressor(activation = 'logistic', solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
         
         ## Fit
         self.NNModel.fit(X_train, Y_train)

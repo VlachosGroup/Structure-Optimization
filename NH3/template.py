@@ -109,11 +109,11 @@ class dyno_struc(object):
         '''
         
         self.KMC_NetX = nx.Graph()
-        self.KMC_NetX.add_nodes_from(range(len(kmc_lat.site_type_inds)))
-        self.KMC_NetX.add_edges_from(kmc_lat.neighbor_list)
+        self.KMC_NetX.add_nodes_from(range(len(self.KMC_lat.site_type_inds)))
+        self.KMC_NetX.add_edges_from(self.KMC_lat.neighbor_list)
 
-        for i in range(len(kmc_lat.site_type_inds)):
-            self.KMC_NetX.node[i]['type'] = kmc_lat.site_type_names[kmc_lat.site_type_inds[i]-1]
+        for i in range(len(self.KMC_lat.site_type_inds)):
+            self.KMC_NetX.node[i]['type'] = self.KMC_lat.site_type_names[self.KMC_lat.site_type_inds[i]-1]
             
 
     def count_fingerprints(self):
