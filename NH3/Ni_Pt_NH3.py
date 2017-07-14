@@ -517,7 +517,7 @@ if __name__ == "__main__":
     
         # Read structures from xsd files
         x.ASE_template = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\NiPt_template.xsd', format = 'xsd')
-        x.ASE_defected = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\defected_4.xsd', format = 'xsd')
+        x.ASE_defected = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\defected_5.xsd', format = 'xsd')
         x.ASE_to_atoms_missing()
     
     # Build NetworkX graph of the defected structure
