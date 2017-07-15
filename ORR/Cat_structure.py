@@ -5,6 +5,7 @@ Created on Fri May 26 13:41:45 2017
 @author: mpnun
 """
 
+import os
 import numpy as np
 import copy
 import random
@@ -19,8 +20,9 @@ from ase.io import write
 from metal import metal
 from ORR import ORR_rate
 from graph_theory import Graph
+from Genetic import MOGA
 
-class cat_structure:
+class cat_structure:        # should inherit from a template class for objects for genetic algorithm
     
     '''
     Catalyst structure with defects
@@ -247,3 +249,17 @@ class cat_structure:
         defect_atoms_obj.set_chemical_symbols(chem_symbs)
         
         write('best_struc_' + str(gen_num) + '.png', defect_atoms_obj )
+        
+        
+if __name__ == "__main__":
+    
+    os.system('clear')
+        
+    # Numerical parameters
+    p_count = 10                   # population size    
+    n_gens = 100                    # number of generations
+    
+    x = MOGA()
+    x.pop = [cat_structure('Pt', '111', 8, 8) for i in range(p_count)]
+    x.randomize_pop()
+    x.genetic_algorithm(n_gens, n_snaps = 10)

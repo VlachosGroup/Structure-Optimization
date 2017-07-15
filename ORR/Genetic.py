@@ -11,6 +11,13 @@ import time
 import matplotlib.pyplot as plt
 
 
+#class GA_individual(object):
+#    
+#    def __init__(self):
+#        pass
+#    
+#    def 
+
 class MOGA():
     
     '''
@@ -24,8 +31,10 @@ class MOGA():
         Initialize with an empty population
         '''
         
-        self.pop = None                     # List of individuals
+        self.P = None                       # Population: List of individuals
+        self.Q = None                       # candidate population
         self.fitnesses = None               # Fitness values for the individuals in the population
+        
 
 
     def randomize_pop(self):
@@ -34,12 +43,25 @@ class MOGA():
         Create a random initial population of size n_pop
         '''
         
-        if self.pop is None:
+        if self.P is None:
             raise NameError('Population has not been initialized.')
             
-        for indiv in self.pop:
+        for indiv in self.P:
             indiv.randomize()
     
+
+#    def eval_pop(self):
+#        
+#        '''
+#        Evaluate the objective functions for all individuals in the population
+#        '''
+#        
+#        graded_pop = [ [ 0, 0, i ] for i in range( len( self.P )) ]
+#        for i in range( len( self.P )):
+#            score = self.P[i].eval_OFs()
+#            graded_pop[i][0] = score[0]
+#            graded_pop[i][1] = score[1]
+            
 
     def genetic_algorithm(self, n_gens, n_snaps = 0):
 
@@ -77,6 +99,13 @@ class MOGA():
         print('Time elapsed: ' + str(CPU_end - CPU_start) )
             
 
+    def create_candidates(self):
+        
+        '''
+        Use the population P to create the candidate population Q
+        '''
+        self.Q = []
+
     def evolve(self, retain=0.2, random_select=0.1, mutate=0.3, sigma = 1., controlled = False):
     
         '''
@@ -89,20 +118,23 @@ class MOGA():
                     If false use the neural network
         Uses the algorithm from K. Deb, S. Pratab, S. Agarwal, and T. Meyarivan, IEEE Trans. Evol. Comput. 6, 182 (2002).
         '''    
-        
+#        print self.P
+
+#        R = self.P + self.Q
+
         # Evaluate fitness values for the population
-        graded_pop = [ [ 0, 0, i ] for i in range( len( self.pop )) ]
-        for i in range( len( self.pop )):
-            score = self.pop[i].eval_OFs()
+        graded_pop = [ [ 0, 0, i ] for i in range( len( self.P )) ]
+        for i in range( len( self.P )):
+            score = self.P[i].eval_OFs()
             graded_pop[i][0] = score[0]
             graded_pop[i][1] = score[1]
             
         '''
         Find domination relationships
         '''
-        n = [0 for i in range( len( self.pop ) ) ]                      # Number of individuals which dominate n
-        S = [ [] for i in range( len( self.pop ) ) ]                    # Set of individuals which the individual dominates
-        for i in range( len( self.pop )):           # i in [0,1,...,n-1]
+        n = [0 for i in range( len( self.P ) ) ]                      # Number of individuals which dominate n
+        S = [ [] for i in range( len( self.P ) ) ]                    # Set of individuals which the individual dominates
+        for i in range( len( self.P )):           # i in [0,1,...,n-1]
             for j in range(i):                      # j < i
                 
                 if graded_pop[i][0] < graded_pop[j][0] and graded_pop[i][1] < graded_pop[j][1]:             # i dominates j
@@ -118,8 +150,8 @@ class MOGA():
         Identify the various levels of Pareto fronts
         '''
         Fronts = [ [] ]
-        ranks = [0 for i in range( len( self.pop ) ) ]
-        for i in range( len( self.pop )):
+        ranks = [0 for i in range( len( self.P ) ) ]
+        for i in range( len( self.P )):
             if n[i] == 0:
                 Fronts[0].append(i)
                 ranks[i] = 0
@@ -150,7 +182,7 @@ class MOGA():
         '''
         
         graded_pop_arr = np.array( graded_pop )        
-        dist_met = [0 for i in range( len( self.pop ) ) ]       # Average distance from adjacent individuals on its front
+        dist_met = [0 for i in range( len( self.P ) ) ]       # Average distance from adjacent individuals on its front
 
         for f in Fronts:                                        # Loop through each front
             
@@ -164,25 +196,32 @@ class MOGA():
                 
                 for ind in range(1, sorted_data.shape[0]-1):
                     if sorted_data[-1, m] - sorted_data[0, m] > 0:      # Accounts for the case of no diversity in one of the objectives
-                        dist_met[ int( sorted_data[ind,-1] ) ] += ( sorted_data[ind+1, m] - sorted_data[ind-1, m] ) / ( sorted_data[-1, m] - sorted_data[0, m] )       # Add normalized distance to nearest neighbors
+                        dist_met[ int( sorted_data[ind,-1] ) ] += ( sorted_data[ind+1, m] - sorted_data[ind-1, m] ) / ( sorted_data[-1, m] - sorted_data[0, m] )       # Add normalized distance to nearest neighbors                
+            
+            # Sort the front accoeding to distances
+            to_sort = [ [dist_met[f[i]] , f[i] ] for i in range(len(f))]
+            to_sort = sorted(to_sort, reverse=True)
+            f = [to_sort[i][1] for i in range(len(f))]
+            
         
-        print dist_met
-        
-        raise NameError('stop')
-        
-        graded_pop = sorted(graded_pop)
-        sorted_pop = [ self.pop[ graded_pop[i][2] ] for i in range( len( graded_pop ))]
-        self.fitnesses = np.array( [ [graded_pop[i][1], graded_pop[i][0]] for i in range( len( graded_pop ))] )
-        
+        # Should sort according to distance
         # Should record the best and average fitness values
 
-        retain_length = int(len(self.pop) * retain)
-        new_pop = sorted_pop[:retain_length]            # Take the bottom scores
+        retain_length = int(len(self.P) * retain)
+        new_pop = []
+        front_ind = 0
+        ind_in_front = 0
+        while len(new_pop) < retain_length:
+            new_pop.append( self.P[ Fronts[front_ind][ind_in_front] ] )
+            ind_in_front += 1
+            if ind_in_front >= len(Fronts[front_ind]):
+                front_ind += 1
+                ind_in_front = 0
         
         # randomly add other individuals to promote genetic diversity
-        for individual in sorted_pop[retain_length:]:
-            if random_select > random.random():
-                new_pop.append(individual)
+#        for individual in sorted_pop[retain_length:]:
+#            if random_select > random.random():
+#                new_pop.append(individual)
         
         # Mutate some individuals
         for individual in new_pop:
@@ -190,7 +229,7 @@ class MOGA():
                 individual.mutate()
           
         # Crossover parents to create children    
-        desired_length = len(self.pop) - len(new_pop)
+        desired_length = len(self.P) - len(new_pop)
         children = []
         while len(children) < desired_length:
             
@@ -201,7 +240,7 @@ class MOGA():
     
         new_pop.extend(children)
         
-        self.pop = new_pop
+        self.P = new_pop
     
     
     def plot_pop(self, fname = None, gen_num = None):
@@ -209,6 +248,13 @@ class MOGA():
         '''
         Plot the objective function values of each individual in the population
         '''    
+
+        grades = [[0, 0] for i in range(len(self.P))]
+        for i in range(len(self.P)):
+            OFs = self.P[i].eval_OFs()
+            grades[i] = OFs
+            
+        self.fitnesses = np.array(grades)
 
         plt.plot(self.fitnesses[:,0].reshape(-1,1), self.fitnesses[:,1].reshape(-1,1), marker='o', color = 'k', linestyle = 'None')       # population
         plt.xlabel('$y_1$',size=24)
@@ -227,4 +273,4 @@ class MOGA():
             plt.savefig(fname)
             plt.close()
             
-        self.pop[0].show(gen_num)
+        # Should also show the x values for the best individual so far
