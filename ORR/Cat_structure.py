@@ -20,9 +20,9 @@ from ase.io import write
 from metal import metal
 from ORR import ORR_rate
 from graph_theory import Graph
-from Genetic import MOGA
+from Genetic import MOGA, MOGA_individual
 
-class cat_structure:        # should inherit from a template class for objects for genetic algorithm
+class cat_structure(MOGA_individual):
     
     '''
     Catalyst structure with defects
@@ -92,7 +92,7 @@ class cat_structure:        # should inherit from a template class for objects f
         self.evaluated = False
         
     
-    def eval_OFs(self):
+    def get_OFs(self):
         
         '''
         Evaluate the objective functions
@@ -113,9 +113,11 @@ class cat_structure:        # should inherit from a template class for objects f
         Used in the genetic algorithm
         '''
         
-        atom_to_flip = random.choice(self.variable_atoms)
-        self.flip_atom(atom_to_flip)
-        self.evaluated = False
+        child = copy.deepcopy(self)
+        atom_to_flip = random.choice(child.variable_atoms)
+        child.flip_atom(atom_to_flip)
+        child.evaluated = False
+        return child
         
     
     def crossover(self, mate):
@@ -125,7 +127,6 @@ class cat_structure:        # should inherit from a template class for objects f
         Return the child
         '''
         
-        child = cat_structure('Pt', '111', 12, 12)
         child = copy.deepcopy(self)
         child.defected_graph = copy.deepcopy(child.template_graph)
         
@@ -256,10 +257,10 @@ if __name__ == "__main__":
     os.system('clear')
         
     # Numerical parameters
-    p_count = 10                   # population size    
-    n_gens = 100                    # number of generations
+    p_count = 100                   # population size    
+    n_gens = 1000                    # number of generations
     
     x = MOGA()
-    x.pop = [cat_structure('Pt', '111', 8, 8) for i in range(p_count)]
+    x.P = [cat_structure('Pt', '111', 8, 8) for i in range(p_count)]
     x.randomize_pop()
-    x.genetic_algorithm(n_gens, n_snaps = 10)
+    x.genetic_algorithm(n_gens, n_snaps = 100)

@@ -46,12 +46,31 @@ G_O2g = -9.9294            # gas thermo obtained from ../DFT_data/Volcano_rederi
 G_OH = G_OH - 0.5 * G_H2g - 0.5 * G_O2g
 G_OOH = G_OOH - 0.5 * G_H2g - G_O2g
 G_H2Ol = G_H2Ol - G_H2g - 0.5 * G_O2g
+G_O2g = 0.
+G_H2g = 0.
+G_O = (G_OOH + G_OH + G_H2Ol) / 2 - G_H2Ol        # make O the average
+G_H_e = -0.9
 
-print G_OH
+print '\nCluster energies'
 print G_OOH
-print G_H2Ol
+print G_O
+print G_OH
 
-print G_OH + G_H2Ol
-print 2 * G_H2Ol
+print '\nState energies'
+S1 =  G_O2g + 4 * G_H_e
+S2 =  G_OOH + 3 * G_H_e
+S3 = G_O + G_H2Ol + 2 * G_H_e
+S4 = G_OH + G_H2Ol + 1 * G_H_e
+S5 = 2 * G_H2Ol
 
-print (G_OOH + G_OH +G_H2Ol) / 2 -G_H2Ol
+print S1
+print S2
+print S3
+print S4
+print S5
+
+print '\nDelta Gs'
+print S2 - S1
+print S3 - S2
+print S4 - S3
+print S5 - S4

@@ -11,12 +11,30 @@ import time
 import matplotlib.pyplot as plt
 
 
-#class GA_individual(object):
-#    
-#    def __init__(self):
-#        pass
-#    
-#    def 
+class MOGA_individual(object):
+    
+    '''
+    Template class for an individual used in the genetic algorithm
+    '''
+    
+    def __init__(self):
+        pass
+
+    def randomize(self):
+        pass
+         
+    def get_OFs(self):
+        pass
+    
+    def eval_OFs(self):
+        pass
+     
+    def mutate(self):
+        pass
+         
+    def crossover(self, mate):
+        pass
+
 
 class MOGA():
     
@@ -32,9 +50,7 @@ class MOGA():
         '''
         
         self.P = None                       # Population: List of individuals
-        self.Q = None                       # candidate population
-        self.fitnesses = None               # Fitness values for the individuals in the population
-        
+        self.Q = None                       # candidate population        
 
 
     def randomize_pop(self):
@@ -48,19 +64,6 @@ class MOGA():
             
         for indiv in self.P:
             indiv.randomize()
-    
-
-#    def eval_pop(self):
-#        
-#        '''
-#        Evaluate the objective functions for all individuals in the population
-#        '''
-#        
-#        graded_pop = [ [ 0, 0, i ] for i in range( len( self.P )) ]
-#        for i in range( len( self.P )):
-#            score = self.P[i].eval_OFs()
-#            graded_pop[i][0] = score[0]
-#            graded_pop[i][1] = score[1]
             
 
     def genetic_algorithm(self, n_gens, n_snaps = 0):
@@ -80,13 +83,13 @@ class MOGA():
         else:
             snap_record = [int( float(i) / (n_snaps - 1) * ( n_gens ) ) for i in range(n_snaps)]
 
-#        if n_snaps > 0:
-#            snap_ind += 1
-#            self.plot_pop(fname = 'pop_pic_1.png', gen_num = 0)
+        if n_snaps > 0:
+            snap_ind += 1
+            self.plot_pop(fname = 'pop_pic_1.png', gen_num = 0)
     
         CPU_start = time.time()
         for i in xrange(n_gens):
-
+            print 'Generation ' + str(i)
             # Evolve population
             self.evolve()
             
@@ -96,17 +99,10 @@ class MOGA():
                 self.plot_pop(fname = 'pop_pic_' + str(snap_ind) + '.png' , gen_num = i+1)
                 
         CPU_end = time.time()
-        print('Time elapsed: ' + str(CPU_end - CPU_start) )
+        print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
             
 
-    def create_candidates(self):
-        
-        '''
-        Use the population P to create the candidate population Q
-        '''
-        self.Q = []
-
-    def evolve(self, retain=0.2, random_select=0.1, mutate=0.3, sigma = 1., controlled = False):
+    def evolve(self):
     
         '''
         Execute one generation of the genetic algorithm
@@ -118,22 +114,26 @@ class MOGA():
                     If false use the neural network
         Uses the algorithm from K. Deb, S. Pratab, S. Agarwal, and T. Meyarivan, IEEE Trans. Evol. Comput. 6, 182 (2002).
         '''    
-#        print self.P
 
-#        R = self.P + self.Q
+        N = len(self.P)
+        R = self.P
+        if not self.Q is None:          # self.Q is None for the 1st generation
+            R = self.P + self.Q
 
-        # Evaluate fitness values for the population
-        graded_pop = [ [ 0, 0, i ] for i in range( len( self.P )) ]
-        for i in range( len( self.P )):
-            score = self.P[i].eval_OFs()
+        # Given R, we need to dermine the new P
+
+        # Extract fitness values for R
+        graded_pop = [ [ 0, 0, i ] for i in range( len( R )) ]
+        for i in range( len( R )):
+            score = R[i].get_OFs()
             graded_pop[i][0] = score[0]
             graded_pop[i][1] = score[1]
             
         '''
         Find domination relationships
         '''
-        n = [0 for i in range( len( self.P ) ) ]                      # Number of individuals which dominate n
-        S = [ [] for i in range( len( self.P ) ) ]                    # Set of individuals which the individual dominates
+        n = [0 for i in range( len( R ) ) ]                      # Number of individuals which dominate n
+        S = [ [] for i in range( len( R ) ) ]                    # Set of individuals which the individual dominates
         for i in range( len( self.P )):           # i in [0,1,...,n-1]
             for j in range(i):                      # j < i
                 
@@ -149,9 +149,11 @@ class MOGA():
         '''
         Identify the various levels of Pareto fronts
         '''
+        
+        # Identify the first front
         Fronts = [ [] ]
-        ranks = [0 for i in range( len( self.P ) ) ]
-        for i in range( len( self.P )):
+        ranks = [0 for i in range( len( R ) ) ]
+        for i in range( len( R )):
             if n[i] == 0:
                 Fronts[0].append(i)
                 ranks[i] = 0
@@ -182,7 +184,7 @@ class MOGA():
         '''
         
         graded_pop_arr = np.array( graded_pop )        
-        dist_met = [0 for i in range( len( self.P ) ) ]       # Average distance from adjacent individuals on its front
+        dist_met = [0 for i in range( len( R ) ) ]       # Average distance from adjacent individuals on its front
 
         for f in Fronts:                                        # Loop through each front
             
@@ -204,43 +206,76 @@ class MOGA():
             f = [to_sort[i][1] for i in range(len(f))]
             
         
-        # Should sort according to distance
-        # Should record the best and average fitness values
+        '''
+        Build the new P
+        '''
 
-        retain_length = int(len(self.P) * retain)
-        new_pop = []
+        self.P = []
+        P_indices = []
         front_ind = 0
         ind_in_front = 0
-        while len(new_pop) < retain_length:
-            new_pop.append( self.P[ Fronts[front_ind][ind_in_front] ] )
+        while len(self.P) < N:
+            self.P.append( R[ Fronts[front_ind][ind_in_front] ] )
+            P_indices.append( Fronts[front_ind][ind_in_front] )
             ind_in_front += 1
             if ind_in_front >= len(Fronts[front_ind]):
                 front_ind += 1
                 ind_in_front = 0
         
-        # randomly add other individuals to promote genetic diversity
-#        for individual in sorted_pop[retain_length:]:
-#            if random_select > random.random():
-#                new_pop.append(individual)
+        '''
+        Given the new P, use tournament selection, mutation and crossover to create Q
+        '''
         
-        # Mutate some individuals
-        for individual in new_pop:
-            if mutate > random.random():
-                individual.mutate()
-          
-        # Crossover parents to create children    
-        desired_length = len(self.P) - len(new_pop)
-        children = []
-        while len(children) < desired_length:
+        self.Q = []
+        frac_mutate = 0.5       # fraction of Q filled with mutations. The rest is filled with crossover.
+        
+        # Tournament select parents and mutate to create children
+        while len(self.Q) < int(N * frac_mutate):
             
-            momdad = random.sample(new_pop, 2)        
-            Dad = momdad[0]
-            Mom = momdad[1]
-            children.append( Dad.crossover(Mom) )
-    
-        new_pop.extend(children)
-        
-        self.P = new_pop
+            contestants = random.sample(P_indices, 2)   # Need to implment tournament selection here instead      
+            if ranks[contestants[0]] < ranks[contestants[1]]:
+                chosen_one = R[contestants[0]]
+            elif ranks[contestants[1]] < ranks[contestants[0]]:
+                chosen_one = R[contestants[1]]
+            else:
+                if dist_met[contestants[0]] <= dist_met[contestants[1]]:
+                    chosen_one = R[contestants[0]]
+                else:
+                    chosen_one = R[contestants[1]]
+
+            self.Q.append( chosen_one.mutate() )
+          
+        # Crossover parents to create children
+        while len(self.Q) < N:
+            
+            # Tournament select to choose Mom
+            contestants = random.sample(P_indices, 2)   # Need to implment tournament selection here instead      
+            if ranks[contestants[0]] < ranks[contestants[1]]:
+                Mom = R[contestants[0]]
+            elif ranks[contestants[1]] < ranks[contestants[0]]:
+                Mom = R[contestants[1]]
+            else:
+                if dist_met[contestants[0]] <= dist_met[contestants[1]]:
+                    Mom = R[contestants[0]]
+                else:
+                    Mom = R[contestants[1]]
+            
+            # Tournament select to choose Dad
+            contestants = random.sample(P_indices, 2)   # Need to implment tournament selection here instead      
+            if ranks[contestants[0]] < ranks[contestants[1]]:
+                Dad = R[contestants[0]]
+            elif ranks[contestants[1]] < ranks[contestants[0]]:
+                Dad = R[contestants[1]]
+            else:
+                if dist_met[contestants[0]] <= dist_met[contestants[1]]:
+                    Dad = R[contestants[0]]
+                else:
+                    Dad = R[contestants[1]]
+            
+            # Crossover Mom and Dad to create a child
+            self.Q.append( Dad.crossover(Mom) )
+            if len(self.Q) < N:                     # Crossover the other way of there is still room
+                self.Q.append( Mom.crossover(Dad) )
     
     
     def plot_pop(self, fname = None, gen_num = None):
@@ -251,12 +286,11 @@ class MOGA():
 
         grades = [[0, 0] for i in range(len(self.P))]
         for i in range(len(self.P)):
-            OFs = self.P[i].eval_OFs()
-            grades[i] = OFs
+            grades[i] = self.P[i].get_OFs()
             
-        self.fitnesses = np.array(grades)
+        fitnesses = np.array(grades)
 
-        plt.plot(self.fitnesses[:,0].reshape(-1,1), self.fitnesses[:,1].reshape(-1,1), marker='o', color = 'k', linestyle = 'None')       # population
+        plt.plot(fitnesses[:,0].reshape(-1,1), fitnesses[:,1].reshape(-1,1), marker='o', color = 'k', linestyle = 'None')       # population
         plt.xlabel('$y_1$',size=24)
         plt.ylabel('$y_2$',size=24)
         plt.xticks(size=20)
