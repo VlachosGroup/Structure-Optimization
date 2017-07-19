@@ -19,8 +19,10 @@ def ORR_rate(delEads_OH, delEads_OOH):
     kB = 8.617e-5                      # eV / K
     T = 298.15                         # K
     U_0 = 1.23                         # eV, theoretical maximum cell voltage for ORR
-    i_c = 6.1070e-07                    # miliAmperes (mA) per atom, divide by surface area to get current density      
-        
+    U = 0.9                             # V, cathode potential
+    i_c = 1.6123434625e-12                    # miliAmperes (mA) per atom, divide by surface area to get current density          
+    n = 1                               # number of electrons tranfered in each step    
+    
     # *OH, *OOH
     E_g = [-7.53, -13.26]
     ZPE = [0.332, 0.428]                # find actual values, eV
@@ -35,15 +37,11 @@ def ORR_rate(delEads_OH, delEads_OOH):
     G_O2g = -9.9294            # gas thermo obtained from ../DFT_data/Volcano_rederive.m
     
     # Compute G1 and G4
-    G1 = G_OOH - G_O2g - 0.5 * G_H2g
-    G4 = G_H2Ol - G_OH - 0.5 * G_H2g
+    G1 = G_OOH - G_O2g - 0.5 * G_H2g + U * n
+    G4 = G_H2Ol - G_OH - 0.5 * G_H2g + U * n
     
-    n = 1          # number of electrons transferred each step
-    U1 = -G1/n
-    U4 = -G4/n
-    U = min(U1,U4)     # minimum potential you can run the cell at so that no step is activated (onset potential?)
-    
-    j = i_c * np.exp( - (U_0 - U) / (kB * T) )
+    delG_max = max(G1,G4)
+    j = i_c * np.exp( - delG_max  / (kB * T) )
     
     # Check which step is rate determining
     is_step_4 = G1 < G4;          # *OH desorption (Step 4) is rate determining

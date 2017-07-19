@@ -20,6 +20,17 @@ class Graph(object):
             graph_dict = {}
         self.__graph_dict = graph_dict
 
+    def copy_data(self):
+        ''' returns a copy of the graph with the same dictionary '''
+        c = Graph()
+        c.__graph_dict = {}
+        for vertex in self.__graph_dict:
+            c.__graph_dict[vertex] = []
+            for nn in self.__graph_dict[vertex]:
+                c.__graph_dict[vertex].append(nn)
+            
+        return c
+
     def vertices(self):
         """ returns the vertices of a graph """
         return list(self.__graph_dict.keys())

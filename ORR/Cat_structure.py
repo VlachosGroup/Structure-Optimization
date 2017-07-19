@@ -26,9 +26,9 @@ class cat_structure(MOGA_individual):
     
     '''
     Catalyst structure with defects
-    '''    
+    '''            
     
-    def __init__(self, met_name, facet, dim1, dim2):
+    def __init__(self, met_name = None, facet = None, dim1 = None, dim2 = None):
         
         self.metal = None
         self.atoms_obj_template = None
@@ -42,48 +42,66 @@ class cat_structure(MOGA_individual):
         self.current_density = None
         self.surf_eng = None
         
-        '''
-        Build the slab
-        '''        
+        if not met_name is None:
         
-        self.metal = metal(met_name)
-        
-        if facet == '111' or facet == 111:
-            self.atoms_obj_template = fcc111(met_name, size=(dim1, dim2, 4), vacuum=15.0)
-        elif facet == '100' or facet == 100:
-            self.atoms_obj_template = fcc100(met_name, size=(dim1, dim2, 4), vacuum=15.0)
-        else:
-            raise ValueError(str(facet) + ' is not a valid facet.')
+            '''
+            Build the slab
+            '''        
             
-        self.atoms_obj_template.set_pbc([True, True, False])
-        
-        # Find neighbors based on distances
-        rad_list = ( 2.77 + 0.2 ) / 2 * np.ones(len(self.atoms_obj_template))               # list of neighboradii for each site
-        neighb_list = NeighborList(rad_list, self_interaction = False)      # set bothways = True to include both ways
-        neighb_list.build(self.atoms_obj_template)
-        
-        self.template_graph = Graph()
-        for i in range(len(self.atoms_obj_template)):
-            self.template_graph.add_vertex(i)
-        
-        for i in range(len(self.atoms_obj_template)):
-            for j in neighb_list.neighbors[i]:
-                self.template_graph.add_edge([i,j])
+            self.metal = metal(met_name)
             
-        self.active_atoms = range(2 * dim1 * dim2, 4 * dim1 * dim2)
-        self.variable_atoms = range(3 * dim1 * dim2, 4 * dim1 * dim2)
-        self.defected_graph = copy.deepcopy(self.template_graph)        
-        
-        # Compute surface area for use in normalization      
-        self.surface_area = np.linalg.norm( np.cross( self.atoms_obj_template.get_cell()[0,:], self.atoms_obj_template.get_cell()[1,:] ) )        
+            if facet == '111' or facet == 111:
+                self.atoms_obj_template = fcc111(met_name, size=(dim1, dim2, 4), vacuum=15.0)
+            elif facet == '100' or facet == 100:
+                self.atoms_obj_template = fcc100(met_name, size=(dim1, dim2, 4), vacuum=15.0)
+            else:
+                raise ValueError(str(facet) + ' is not a valid facet.')
+                
+            self.atoms_obj_template.set_pbc([True, True, False])
+            
+            # Find neighbors based on distances
+            rad_list = ( 2.77 + 0.2 ) / 2 * np.ones(len(self.atoms_obj_template))               # list of neighboradii for each site
+            neighb_list = NeighborList(rad_list, self_interaction = False)      # set bothways = True to include both ways
+            neighb_list.build(self.atoms_obj_template)
+            
+            self.template_graph = Graph()
+            for i in range(len(self.atoms_obj_template)):
+                self.template_graph.add_vertex(i)
+            
+            for i in range(len(self.atoms_obj_template)):
+                for j in neighb_list.neighbors[i]:
+                    self.template_graph.add_edge([i,j])
+                
+            self.active_atoms = range(2 * dim1 * dim2, 4 * dim1 * dim2)
+            self.variable_atoms = range(3 * dim1 * dim2, 4 * dim1 * dim2)
+            self.defected_graph = copy.deepcopy(self.template_graph)        
+            
+            # Compute surface area for use in normalization      
+            self.surface_area = np.linalg.norm( np.cross( self.atoms_obj_template.get_cell()[0,:], self.atoms_obj_template.get_cell()[1,:] ) )        
 
+
+    def copy_data(self):
+        
+        '''
+        Create a new individual with identical essential data
+        '''
+        
+        child = cat_structure()
+        child.metal = self.metal
+        child.active_atoms = self.active_atoms
+        child.variable_atoms = self.variable_atoms
+        child.template_graph = self.template_graph
+        child.defected_graph = self.defected_graph.copy_data()
+        child.surface_area = self.surface_area
+        return child
+    
     
     def randomize(self, coverage = 0.5):
         
         '''
         Randomize the occupancies in the top layer
         '''
-        
+
         n_vacancies = round( coverage * len(self.variable_atoms) )
         n_vacancies = int(n_vacancies)
         vacant_sites = random.sample(self.variable_atoms, n_vacancies)
@@ -105,7 +123,7 @@ class cat_structure(MOGA_individual):
         
         return [self.surf_eng, -self.current_density]
     
-    
+
     def mutate(self):
         
         '''
@@ -113,7 +131,8 @@ class cat_structure(MOGA_individual):
         Used in the genetic algorithm
         '''
         
-        child = copy.deepcopy(self)
+        child = self.copy_data()
+        
         atom_to_flip = random.choice(child.variable_atoms)
         child.flip_atom(atom_to_flip)
         child.evaluated = False
@@ -127,8 +146,8 @@ class cat_structure(MOGA_individual):
         Return the child
         '''
         
-        child = copy.deepcopy(self)
-        child.defected_graph = copy.deepcopy(child.template_graph)
+        child = self.copy_data()
+        child.defected_graph = child.template_graph.copy_data()
         
         ind = 0
         for site in child.variable_atoms:
@@ -167,8 +186,8 @@ class cat_structure(MOGA_individual):
                     curr += ORR_rate(BE_OH, BE_OOH)
                 
         if normalize:
-            curr = curr / self.surface_area           # normalize by surface area
-            
+            curr = curr / ( self.surface_area * 1.0e-16)          # normalize by surface area (in square centimeters)
+  
         return curr
         
     
@@ -188,7 +207,8 @@ class cat_structure(MOGA_individual):
                 E_form += self.metal.E_coh * ( 1 - np.sqrt( atom_graph.get_coordination_number(i) / 12.0 ) )
                 
         if normalize:
-            E_form = E_form / self.surface_area           # normalize by surface area
+            E_form = E_form * 1.60218e-19                                             # convert energy from eV to Joules
+            E_form = E_form / ( self.surface_area * 1.0e-20)                # normalize by surface area (in square meters)
                 
         return E_form
 
@@ -255,12 +275,24 @@ class cat_structure(MOGA_individual):
 if __name__ == "__main__":
     
     os.system('clear')
-        
+    
+    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 10, dim2 = 10)
+#    ofs = x.get_OFs()
+#    print 'Surface energy: ' + str(ofs[0]) + ' J/m^2'
+#    print 'Current density: ' + str(ofs[1]) + ' mA/cm^2'
+#    
+#    raise NameError('stop')
+    
+    
+    '''
+    Genetic algorithm optimization
+    '''
+    
     # Numerical parameters
     p_count = 100                   # population size    
-    n_gens = 1000                    # number of generations
+    n_gens = 100                    # number of generations
     
     x = MOGA()
-    x.P = [cat_structure('Pt', '111', 8, 8) for i in range(p_count)]
+    x.P = [template.copy_data() for i in range(p_count)]
     x.randomize_pop()
-    x.genetic_algorithm(n_gens, n_snaps = 100)
+    x.genetic_algorithm(n_gens, n_snaps = 10)

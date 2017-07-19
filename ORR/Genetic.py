@@ -62,7 +62,7 @@ class MOGA():
         if self.P is None:
             raise NameError('Population has not been initialized.')
             
-        for indiv in self.P:
+        for indiv in self.P: 
             indiv.randomize()
             
 
