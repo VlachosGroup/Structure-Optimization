@@ -93,15 +93,18 @@ class cat_structure(MOGA_individual):
         child.template_graph = self.template_graph
         child.defected_graph = self.defected_graph.copy_data()
         child.surface_area = self.surface_area
+        child.atoms_obj_template = self.atoms_obj_template
         return child
     
     
-    def randomize(self, coverage = 0.5):
+    def randomize(self, coverage = None):
         
         '''
         Randomize the occupancies in the top layer
         '''
-
+        
+        if coverage is None:
+            coverage = 0.1 + 0.8 * random.random()
         n_vacancies = round( coverage * len(self.variable_atoms) )
         n_vacancies = int(n_vacancies)
         vacant_sites = random.sample(self.variable_atoms, n_vacancies)
@@ -124,7 +127,7 @@ class cat_structure(MOGA_individual):
         return [self.surf_eng, -self.current_density]
     
 
-    def mutate(self):
+    def mutate(self, sigma):
         
         '''
         Mutates an individual to yield an offspring
@@ -132,9 +135,9 @@ class cat_structure(MOGA_individual):
         '''
         
         child = self.copy_data()
-        
-        atom_to_flip = random.choice(child.variable_atoms)
-        child.flip_atom(atom_to_flip)
+        atoms_to_flip = random.sample(child.variable_atoms, max( [1, int(sigma * len(child.variable_atoms) )] ) )
+        for atom_to_flip in atoms_to_flip:
+            child.flip_atom(atom_to_flip)
         child.evaluated = False
         return child
         
@@ -247,7 +250,7 @@ class cat_structure(MOGA_individual):
                     self.defected_graph.add_edge([ind, neighb])
     
 
-    def show(self, gen_num):
+    def show(self, n_struc):
                 
         '''
         Print image of surface
@@ -269,15 +272,16 @@ class cat_structure(MOGA_individual):
         defect_atoms_obj.set_atomic_numbers(a_nums)
         defect_atoms_obj.set_chemical_symbols(chem_symbs)
         
-        write('best_struc_' + str(gen_num) + '.png', defect_atoms_obj )
-        
+        write('structure_' + str(n_struc) + '.png', defect_atoms_obj )
+
         
 if __name__ == "__main__":
     
     os.system('clear')
+    os.chdir('C:\Users\mpnun\Desktop\GA_run')
     
-    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 10, dim2 = 10)
-#    ofs = x.get_OFs()
+    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 12, dim2 = 12)
+#    ofs = template.get_OFs()
 #    print 'Surface energy: ' + str(ofs[0]) + ' J/m^2'
 #    print 'Current density: ' + str(ofs[1]) + ' mA/cm^2'
 #    
@@ -290,9 +294,10 @@ if __name__ == "__main__":
     
     # Numerical parameters
     p_count = 100                   # population size    
-    n_gens = 100                    # number of generations
+    n_gens = 1000                    # number of generations
     
     x = MOGA()
     x.P = [template.copy_data() for i in range(p_count)]
     x.randomize_pop()
-    x.genetic_algorithm(n_gens, n_snaps = 10)
+    x.P[0] = template.copy_data()       # Make sure that the ideal surface is included in the initial population
+    x.genetic_algorithm(n_gens, n_snaps = 11)

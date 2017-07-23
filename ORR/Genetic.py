@@ -29,10 +29,13 @@ class MOGA_individual(object):
     def eval_OFs(self):
         pass
      
-    def mutate(self):
+    def mutate(self, sigma):
         pass
          
     def crossover(self, mate):
+        pass
+    
+    def show(self, i):
         pass
 
 
@@ -89,9 +92,9 @@ class MOGA():
     
         CPU_start = time.time()
         for i in xrange(n_gens):
-            print 'Generation ' + str(i)
+            print 'Generation ' + str(i+1)
             # Evolve population
-            self.evolve()
+            self.evolve(0.1 * (1 - i / n_gens))
             
             # Show the population if it is a snapshot generation
             if i+1 in snap_record:
@@ -100,9 +103,14 @@ class MOGA():
                 
         CPU_end = time.time()
         print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
+        
+        i = 1
+        for indiv in self.P:
+            indiv.show(i)
+            i += 1
             
 
-    def evolve(self):
+    def evolve(self, mutation_severity, frac_mutate = 0.75, frac_elite = 0.75):
     
         '''
         Execute one generation of the genetic algorithm
@@ -110,8 +118,6 @@ class MOGA():
         retain: top fraction to keep
         random_select: 
         mutate: 
-        controlled: If True evaluate the full model and refine the neural network
-                    If false use the neural network
         Uses the algorithm from K. Deb, S. Pratab, S. Agarwal, and T. Meyarivan, IEEE Trans. Evol. Comput. 6, 182 (2002).
         '''    
 
@@ -207,32 +213,56 @@ class MOGA():
             
         
         '''
-        Build the new P
+        Selection: Select individuals for the new P
         '''
 
         self.P = []
         P_indices = []
+        available = range( len( R ) )
         front_ind = 0
         ind_in_front = 0
-        while len(self.P) < N:
+        while len(self.P) < int( N * frac_elite):
             self.P.append( R[ Fronts[front_ind][ind_in_front] ] )
             P_indices.append( Fronts[front_ind][ind_in_front] )
+            available.remove( Fronts[front_ind][ind_in_front] )
             ind_in_front += 1
             if ind_in_front >= len(Fronts[front_ind]):
                 front_ind += 1
                 ind_in_front = 0
+                
+        # fill in the rest of self.P with more diverse individuals via tournament selection        
+        while len(self.P) < N:
+            
+            if len(available) == 1:
+                chosen_one = available[0]
+            else:
+                contestants = random.sample(available, 2)      
+                if ranks[contestants[0]] < ranks[contestants[1]]:
+                    chosen_one = contestants[0]
+                elif ranks[contestants[1]] < ranks[contestants[0]]:
+                    chosen_one = contestants[1]
+                else:
+                    if dist_met[contestants[0]] <= dist_met[contestants[1]]:
+                        chosen_one = contestants[0]
+                    else:
+                        chosen_one = contestants[1]
+                        
+            self.P.append( R[ chosen_one ] )
+            P_indices.append( chosen_one )
+            available.remove( chosen_one )
+            
         
         '''
         Given the new P, use tournament selection, mutation and crossover to create Q
         '''
         
         self.Q = []
-        frac_mutate = 0.5       # fraction of Q filled with mutations. The rest is filled with crossover.
-        
-        # Tournament select parents and mutate to create children
+        candidate_indices = P_indices
+#        candidate_indices = range( len( R ) )
+        # Mutation: Tournament select parents and mutate to create children
         while len(self.Q) < int(N * frac_mutate):
             
-            contestants = random.sample(P_indices, 2)   # Need to implment tournament selection here instead      
+            contestants = random.sample(candidate_indices, 2)      
             if ranks[contestants[0]] < ranks[contestants[1]]:
                 chosen_one = R[contestants[0]]
             elif ranks[contestants[1]] < ranks[contestants[0]]:
@@ -243,13 +273,13 @@ class MOGA():
                 else:
                     chosen_one = R[contestants[1]]
 
-            self.Q.append( chosen_one.mutate() )
+            self.Q.append( chosen_one.mutate(mutation_severity) )
           
-        # Crossover parents to create children
+        # Crossover: Crossover parents to create children
         while len(self.Q) < N:
             
             # Tournament select to choose Mom
-            contestants = random.sample(P_indices, 2)   # Need to implment tournament selection here instead      
+            contestants = random.sample(candidate_indices, 2)    
             if ranks[contestants[0]] < ranks[contestants[1]]:
                 Mom = R[contestants[0]]
             elif ranks[contestants[1]] < ranks[contestants[0]]:
@@ -261,7 +291,7 @@ class MOGA():
                     Mom = R[contestants[1]]
             
             # Tournament select to choose Dad
-            contestants = random.sample(P_indices, 2)   # Need to implment tournament selection here instead      
+            contestants = random.sample(candidate_indices, 2)
             if ranks[contestants[0]] < ranks[contestants[1]]:
                 Dad = R[contestants[0]]
             elif ranks[contestants[1]] < ranks[contestants[0]]:
@@ -273,9 +303,13 @@ class MOGA():
                     Dad = R[contestants[1]]
             
             # Crossover Mom and Dad to create a child
-            self.Q.append( Dad.crossover(Mom) )
-            if len(self.Q) < N:                     # Crossover the other way of there is still room
-                self.Q.append( Mom.crossover(Dad) )
+            child1 = Dad.crossover(Mom)
+            child1.mutate(mutation_severity)
+            self.Q.append( child1 )
+            if len(self.Q) < N:                     # Crossover the other way if there is still room
+                child2 = Mom.crossover(Dad)
+                child2.mutate(mutation_severity)
+                self.Q.append( child2 )
     
     
     def plot_pop(self, fname = None, gen_num = None):
