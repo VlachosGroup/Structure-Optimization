@@ -13,8 +13,11 @@ import matplotlib.pyplot as plt
 import matplotlib as mat
 import matplotlib.ticker as mtick
 
+import sys
+sys.path.append('C:\Users\mpnun\OneDrive\Documents\\ase')
 from ase.build import fcc111, fcc100
 from ase.neighborlist import NeighborList
+from ase.io import read
 from ase.io import write
 
 from metal import metal
@@ -26,7 +29,7 @@ class cat_structure(MOGA_individual):
     
     '''
     Catalyst structure with defects
-    '''            
+    '''
     
     def __init__(self, met_name = None, facet = None, dim1 = None, dim2 = None):
         
@@ -104,7 +107,7 @@ class cat_structure(MOGA_individual):
         '''
         
         if coverage is None:
-            coverage = 0.1 + 0.8 * random.random()
+            coverage = random.random()
         n_vacancies = round( coverage * len(self.variable_atoms) )
         n_vacancies = int(n_vacancies)
         vacant_sites = random.sample(self.variable_atoms, n_vacancies)
@@ -112,6 +115,40 @@ class cat_structure(MOGA_individual):
             self.defected_graph.remove_vertex(i)
         self.evaluated = False
         
+    
+    def load_from_file(self, ftoread, d_cut = 0.001):
+    
+        '''
+        Determine which atoms in the template are missing in the defected structure
+        d_cut: distance cutoff in angstroms
+        '''
+
+        ASE_defected = read(ftoread, format = 'xsd')
+
+        for atom_ind in range(len(self.atoms_obj_template)):
+        
+            # Get position and atomic number of the template atom we are trying to find
+            cart_coords = self.atoms_obj_template.get_positions()[atom_ind, :]
+            atomic_num = self.atoms_obj_template.get_atomic_numbers()[atom_ind]
+            
+            defect_ind = 0      # index of defect atom which might be a match
+            dist = 1.0      # distance between atoms we are trying to match
+            
+            match_found = False
+            
+            while (not match_found) and defect_ind < len(ASE_defected):
+            
+                defect_coords = ASE_defected.get_positions()[defect_ind, :]
+                defect_an = ASE_defected.get_atomic_numbers()[defect_ind]
+                dist = np.linalg.norm( cart_coords - defect_coords )
+                match_found = (dist < d_cut) #and (defect_an == atomic_num)         # We do not need to check whether the elements match
+                defect_ind += 1
+                
+            if not match_found:
+                self.defected_graph.remove_vertex(atom_ind)
+
+            self.evaluated = False
+                
     
     def get_OFs(self):
         
@@ -134,12 +171,14 @@ class cat_structure(MOGA_individual):
         Used in the genetic algorithm
         '''
         
-        child = self.copy_data()
-        atoms_to_flip = random.sample(child.variable_atoms, max( [1, int(sigma * len(child.variable_atoms) )] ) )
-        for atom_to_flip in atoms_to_flip:
-            child.flip_atom(atom_to_flip)
-        child.evaluated = False
-        return child
+        n_flipped = 0
+        for atom_to_flip in self.variable_atoms:
+            if np.random.random() < 1.0 / len(self.variable_atoms):
+                self.flip_atom(atom_to_flip)
+                n_flipped += 1
+        
+        if n_flipped > 0:
+            self.evaluated = False
         
     
     def crossover(self, mate):
@@ -250,7 +289,7 @@ class cat_structure(MOGA_individual):
                     self.defected_graph.add_edge([ind, neighb])
     
 
-    def show(self, n_struc):
+    def show(self, n_struc, fmat = 'picture'):
                 
         '''
         Print image of surface
@@ -272,19 +311,27 @@ class cat_structure(MOGA_individual):
         defect_atoms_obj.set_atomic_numbers(a_nums)
         defect_atoms_obj.set_chemical_symbols(chem_symbs)
         
-        write('structure_' + str(n_struc) + '.png', defect_atoms_obj )
+        if fmat == 'picture':
+            write('structure_' + str(n_struc) + '.png', defect_atoms_obj )
+        elif fmat == 'xsd':
+            write('structure_' + str(n_struc) + '.xsd', defect_atoms_obj, format = fmat )
 
         
 if __name__ == "__main__":
     
     os.system('clear')
-    os.chdir('C:\Users\mpnun\Desktop\GA_run')
+#    os.chdir('C:\Users\mpnun\Desktop\GA_run')
+    os.chdir('C:\Users\mpnun\Desktop\GA_run_multi')
     
-    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 12, dim2 = 12)
-#    ofs = template.get_OFs()
+    best_xsd = 'C:\Users\mpnun\Desktop\GA_run\most_active.xsd'
+
+    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 10, dim2 = 10)
+    
+    active_opt = cat_structure(met_name = 'Pt', facet = '111', dim1 = 10, dim2 = 10)
+    active_opt.load_from_file(best_xsd)
+#    ofs = active_opt.get_OFs()
 #    print 'Surface energy: ' + str(ofs[0]) + ' J/m^2'
 #    print 'Current density: ' + str(ofs[1]) + ' mA/cm^2'
-#    
 #    raise NameError('stop')
     
     
@@ -293,11 +340,14 @@ if __name__ == "__main__":
     '''
     
     # Numerical parameters
-    p_count = 100                   # population size    
+    p_count = 50                   # population size
     n_gens = 1000                    # number of generations
     
     x = MOGA()
     x.P = [template.copy_data() for i in range(p_count)]
     x.randomize_pop()
     x.P[0] = template.copy_data()       # Make sure that the ideal surface is included in the initial population
-    x.genetic_algorithm(n_gens, n_snaps = 11)
+    x.P[1] = active_opt                 # Put the activity optimum in the initial population as well
+    x.genetic_algorithm(n_gens, n_snaps = 11, n_obj = 2)
+    
+    x.P[0].show('most_active', fmat = 'xsd')
