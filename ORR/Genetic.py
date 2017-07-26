@@ -107,12 +107,7 @@ class MOGA():
         CPU_end = time.time()
         print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
         
-        i = 1
-        for indiv in self.P:
-            indiv.show(i)
-            i += 1
-            
-
+        
     def evolve_single(self, mutation_severity, frac_mutate = 0.9, frac_elite = 0.1):
     
         '''
@@ -221,7 +216,7 @@ class MOGA():
 #            indiv.mutate(mutation_severity)
                 
 
-    def evolve(self, mutation_severity, frac_mutate = 0.8, frac_elite = 0.2): # frac_elite is probably way too high
+    def evolve(self, mutation_severity, frac_mutate = 0.8, frac_elite = 1.0): # frac_elite is probably way too high
     
         '''
         Execute one generation of the genetic algorithm
@@ -303,6 +298,7 @@ class MOGA():
         graded_pop_arr = np.array( graded_pop )        
         dist_met = [0 for i in range( len( R ) ) ]       # Average distance from adjacent individuals on its front
 
+        front_ind = 0
         for f in Fronts:                                        # Loop through each front
             
             sub_graded_arr = graded_pop_arr[f, :]
@@ -320,27 +316,8 @@ class MOGA():
             # Sort the front accoeding to distances
             to_sort = [ [dist_met[f[i]] , f[i] ] for i in range(len(f))]
             to_sort = sorted(to_sort, reverse=True)
-            f = [to_sort[i][1] for i in range(len(f))]
-        
-#        graded_pop_arr = np.array( graded_pop )        
-#        dist_met = [0 for i in range( len( R ) ) ]       # Average distance from adjacent individuals on its front
-#
-#        sub_graded_arr = graded_pop_arr[:, :]
-#
-#        for m in [0,1]:                                     # m: index of the objective we are considering
-#        
-#            sorted_data = sub_graded_arr[sub_graded_arr[:, m].argsort()]        # sort according to data in the m'th objective
-#            dist_met[ int( sorted_data[ 0, -1] ) ] = float('inf')
-#            
-#            for ind in range(1, sorted_data.shape[0]-1):
-#                if sorted_data[-1, m] - sorted_data[0, m] > 0:      # Accounts for the case of no diversity in one of the objectives
-#                    dist_met[ int( sorted_data[ind,-1] ) ] += ( sorted_data[ind+1, m] - sorted_data[ind-1, m] ) / ( sorted_data[-1, m] - sorted_data[0, m] )       # Add normalized distance to nearest neighbors                
-#            
-#        for f in Fronts:                                        # Loop through each front
-#            # Sort the front according to distances
-#            to_sort = [ [dist_met[f[i]] , f[i] ] for i in range(len(f))]
-#            to_sort = sorted(to_sort, reverse=True)
-#            f = [to_sort[i][1] for i in range(len(f))]
+            Fronts[front_ind] = [to_sort[i][1] for i in range(len(f))]
+            front_ind += 1
             
         
         '''
@@ -360,7 +337,7 @@ class MOGA():
             if ind_in_front >= len(Fronts[front_ind]):
                 front_ind += 1
                 ind_in_front = 0
-                
+       
         # fill in the rest of self.P with more diverse individuals via tournament selection        
         while len(self.P) < N:
             
