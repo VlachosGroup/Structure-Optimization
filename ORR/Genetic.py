@@ -53,7 +53,15 @@ class MOGA():
         '''
         
         self.P = None                       # Population: List of individuals
-        self.Q = None                       # candidate population        
+        self.P_y1 = None                    # first objective function values for individuals in P, doubles
+        self.P_y2 = None
+        
+        self.Q = None                       # candidate population
+        self.Q_y1 = None
+        self.Q_y2 = None
+        
+        self.eval_obj = None
+        
         self.COMM = None                    # object for MPI parallelization
         
 
@@ -68,9 +76,37 @@ class MOGA():
             
         for indiv in self.P: 
             indiv.randomize()
+        
+        
+    def mutate(self, x):
+    
+        '''
+        Mutates an individual to yield an offspring
+        '''
+        
+        x_child = np.array([x[i] for i in range(len(x))])        # copy the data
+        
+        for i in range(len(x_child)):
+            if np.random.random() < 1.0 / len(x_child):
+                if x_child[i] == 0:
+                    x_child[i] = 1
+                else:
+                    x_child[i] = 0
+            
+        return x_child
+        
+        
+    def crossover(self, x1, x2):
+    
+        '''
+        Crossover with a mate
+        Return the child
+        '''
+        
+        return np.hstack( [x1[:len(x1)/2:], x2[len(x1)/2::] ] )
             
 
-    def genetic_algorithm(self, n_gens, n_snaps = 0, n_obj = 2):
+    def genetic_algorithm(self, n_gens, n_snaps = 0):
 
         '''
         Optimize the population using a genetic algorithm
@@ -93,9 +129,17 @@ class MOGA():
         else:
             snap_record = [int( float(i) / (n_snaps - 1) * ( n_gens ) ) for i in range(n_snaps)]
 
-        if n_snaps > 0 and COMM.rank == 0:
+        # Evaluate individuals in P before the 1st generation
+        self.P_y1 = []
+        self.P_y2 = []
+        for p in self.P:
+            OFs = self.eval_obj.eval_x(p)
+            self.P_y1.append(OFs[0])
+            self.P_y2.append(OFs[1])
+            
+        if n_snaps > 0 and self.COMM.rank == 0:
             snap_ind += 1
-            self.plot_pop(fname = 'pop_pic_1.png', gen_num = 0, n_obj = n_obj)
+            self.plot_pop(fname = 'pop_pic_1.png', gen_num = 0)
     
         CPU_start = time.time()
         for i in xrange(n_gens):
@@ -104,15 +148,12 @@ class MOGA():
                 print 'Generation ' + str(i+1)
                 
             # Evolve population
-            if n_obj == 1:
-                self.evolve_single(0.2 * (1 - i / n_gens))
-            else:
-                self.evolve(0.2 * (1 - i / n_gens))
+            self.evolve()
             
             # Show the population if it is a snapshot generation
-            if i+1 in snap_record and COMM.rank == 0:
+            if i+1 in snap_record and self.COMM.rank == 0:
                 snap_ind += 1
-                self.plot_pop(fname = 'pop_pic_' + str(snap_ind) + '.png' , gen_num = i+1, n_obj = n_obj)
+                self.plot_pop(fname = 'pop_pic_' + str(snap_ind) + '.png' , gen_num = i+1)
                 
         CPU_end = time.time()
         print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
@@ -123,115 +164,8 @@ class MOGA():
         #    indiv.show(i, fmat = 'xsd')
         #    i += 1
         
-        
-    def evolve_single(self, mutation_severity, frac_mutate = 0.9, frac_elite = 0.1):
-    
-        '''
-        Execute one generation of the genetic algorithm
-        Evolve the population using metation and crossover
-        retain: top fraction to keep
-        random_select: 
-        mutate: 
-        '''    
 
-        N = len(self.P)
-        R = self.P
-        if not self.Q is None:          # self.Q is None for the 1st generation
-            R = self.P + self.Q
-
-        # Given R, we need to dermine the new P
-
-        # Extract fitness values for R
-        graded_pop = [ [ 0, i ] for i in range( len( R )) ]
-        for i in range( len( R )):
-            score = R[i].get_OFs()
-            graded_pop[i][0] = score[1]
-            
-        sorted_pop = sorted(graded_pop)
-            
-        
-        '''
-        Selection: Select individuals for the new P
-        '''
-
-        self.P = []
-        P_indices = []
-        available = range( len( R ) )
-        ind = 0
-        while len(self.P) < int( N * frac_elite):
-            self.P.append( R[ sorted_pop[ind][1] ] )
-            P_indices.append( sorted_pop[ind][1] )
-            available.remove( sorted_pop[ind][1] )
-            ind += 1
-                
-        # fill in the rest of self.P with more diverse individuals via tournament selection
-        while len(self.P) < N:
-            
-            if len(available) == 1:
-                chosen_one = available[0]
-            else:
-                contestants = random.sample(available, 2)      
-                if sorted_pop[contestants[0]][0] < sorted_pop[contestants[1]][0]:
-                    chosen_one = contestants[0]
-                else:
-                    chosen_one = contestants[1]
-                        
-            self.P.append( R[ chosen_one ] )
-            P_indices.append( chosen_one )
-            available.remove( chosen_one )
-            
-        
-        '''
-        Given the new P, use tournament selection, mutation and crossover to create Q
-        '''
-        
-        self.Q = []
-        candidate_indices = P_indices
-#        candidate_indices = range( len( R ) )
-        # Mutation: Tournament select parents and mutate to create children
-        while len(self.Q) < int(N * frac_mutate):
-            
-            contestants = random.sample(candidate_indices, 2)      
-            if sorted_pop[contestants[0]][0] < sorted_pop[contestants[1]][0]:
-                chosen_one = R[contestants[0]]
-            else:
-                chosen_one = R[contestants[1]]
-
-            chosen_one = chosen_one.copy_data()
-            chosen_one.mutate(mutation_severity)
-            self.Q.append( chosen_one )
-          
-        # Crossover: Crossover parents to create children
-        while len(self.Q) < N:
-            
-            # Tournament select to choose Mom
-            contestants = random.sample(candidate_indices, 2)      
-            if sorted_pop[contestants[0]][0] < sorted_pop[contestants[1]][0]:
-                Mom = R[contestants[0]]
-            else:
-                Mom = R[contestants[1]]
-            
-            # Tournament select to choose Dad
-            contestants = random.sample(candidate_indices, 2)      
-            if sorted_pop[contestants[0]][0] < sorted_pop[contestants[1]][0]:
-                Dad = R[contestants[0]]
-            else:
-                Dad = R[contestants[1]]
-            
-            # Crossover Mom and Dad to create a child
-            child1 = Dad.crossover(Mom)
-            child1.mutate(mutation_severity)
-            self.Q.append( child1 )
-            if len(self.Q) < N:                     # Crossover the other way if there is still room
-                child2 = Mom.crossover(Dad)
-                child2.mutate(mutation_severity)
-                self.Q.append( child2 )
-                
-#        for indiv in self.Q:
-#            indiv.mutate(mutation_severity)
-                
-
-    def evolve(self, mutation_severity, frac_mutate = 0.8):   
+    def evolve(self, frac_mutate = 0.8):   
     
         '''
         Execute one generation of the genetic algorithm
@@ -242,34 +176,33 @@ class MOGA():
         Uses the NSGA-II algorithm from K. Deb, S. Pratab, S. Agarwal, and T. Meyarivan, IEEE Trans. Evol. Comput. 6, 182 (2002).
         '''    
 
+        N = self.P.shape[0]         # number of individuals in the population
+        N_c = self.P.shape[1]       # number of bits for each individual
         
-        
-        N = len(self.P)
-        R = self.P
-        if not self.Q is None:          # self.Q is None for the 1st generation
-            R = self.P + self.Q
+        # Combine P and Q into R (Q is an empty list in the first generation)
+        if self.Q is None:
+            R = self.P
+            R_y1 = self.P_y1
+            R_y2 = self.P_y2
+        else:
+            R = np.vstack([self.P, self.Q])
+            R_y1 = np.hstack([self.P_y1, self.Q_y1])
+            R_y2 = np.hstack([self.P_y2, self.Q_y2])
 
         # Given R, we need to dermine the new P
-
-        # Extract fitness values for R
-        graded_pop = [ [ 0, 0, i ] for i in range( len( R )) ]
-        for i in range( len( R )):
-            score = R[i].get_OFs()
-            graded_pop[i][0] = score[0]
-            graded_pop[i][1] = score[1]
-            
+   
         '''
         Find domination relationships
         '''
-        n = [0 for i in range( len( R ) ) ]                      # Number of individuals which dominate n
-        S = [ [] for i in range( len( R ) ) ]                    # Set of individuals which the individual dominates
+        n = [0 for i in range( R.shape[0] ) ]                      # Number of individuals which dominate n
+        S = [ [] for i in range( R.shape[0] ) ]                    # Set of individuals which the individual dominates
         for i in range( len( self.P )):           # i in [0,1,...,n-1]
             for j in range(i):                      # j < i
                 
-                if graded_pop[i][0] < graded_pop[j][0] and graded_pop[i][1] < graded_pop[j][1]:             # i dominates j
+                if R_y1[i] < R_y1[j] and R_y2[i] < R_y2[j]:             # i dominates j
                     n[j] += 1
                     S[i].append(j)
-                elif graded_pop[j][0] < graded_pop[i][0] and graded_pop[j][1] < graded_pop[i][1]:           # j dominates i
+                elif R_y1[j] < R_y1[i] and R_y2[j] < R_y2[i]:           # j dominates i
                     n[i] += 1
                     S[j].append(i)
                 else:                                                                                       # neither dominates the other
@@ -281,12 +214,13 @@ class MOGA():
         
         # Identify the first front
         Fronts = [ [] ]
-        ranks = [0 for i in range( len( R ) ) ]
-        for i in range( len( R )):
+        ranks = [0 for i in range( R.shape[0] ) ]
+        for i in range( R.shape[0]):
             if n[i] == 0:
                 Fronts[0].append(i)
                 ranks[i] = 0
         
+        # Identify all other fronts
         f_count = 0
         next_front = True
         while next_front:
@@ -311,9 +245,14 @@ class MOGA():
         '''
         Assign distance metric for each individual in each front
         '''
-        
+        # Extract fitness values for R
+        graded_pop = [ [ 0, 0, i ] for i in range( R.shape[0] ) ]
+        for i in range( R.shape[0] ):
+            graded_pop[i][0] = R_y1[i]
+            graded_pop[i][1] = R_y2[i]
+            
         graded_pop_arr = np.array( graded_pop )        
-        dist_met = [0 for i in range( len( R ) ) ]       # Average distance from adjacent individuals on its front
+        dist_met = [0 for i in range( R.shape[0] ) ]       # Average distance from adjacent individuals on its front
 
         front_ind = 0
         for f in Fronts:                                        # Loop through each front
@@ -325,7 +264,7 @@ class MOGA():
                 sorted_data = sub_graded_arr[sub_graded_arr[:, m].argsort()]        # sort according to data in the m'th objective
                 dist_met[ int( sorted_data[ 0, -1] ) ] = float('inf')
                 dist_met[ int( sorted_data[-1, -1] ) ] = float('inf')
-                
+
                 for ind in range(1, sorted_data.shape[0]-1):
                     if sorted_data[-1, m] - sorted_data[0, m] > 0:      # Accounts for the case of no diversity in one of the objectives
                         dist_met[ int( sorted_data[ind,-1] ) ] += ( sorted_data[ind+1, m] - sorted_data[ind-1, m] ) / ( sorted_data[-1, m] - sorted_data[0, m] )       # Add normalized distance to nearest neighbors                
@@ -340,21 +279,32 @@ class MOGA():
         '''
         Selection: Select individuals for the new P
         '''
-
+        
         self.P = []
+        self.P_y1 = []
+        self.P_y2 = []
+            
         P_indices = []
-        available = range( len( R ) )
+        available = range( R.shape[0] )
         front_ind = 0
         ind_in_front = 0
         while len(self.P) < N:
-            self.P.append( R[ Fronts[front_ind][ind_in_front] ] )
+        
+            self.P.append( R[ Fronts[front_ind][ind_in_front], : ] )
+            self.P_y1.append( R_y1[ Fronts[front_ind][ind_in_front] ] )
+            self.P_y2.append( R_y2[ Fronts[front_ind][ind_in_front] ] )
+            
             P_indices.append( Fronts[front_ind][ind_in_front] )
             available.remove( Fronts[front_ind][ind_in_front] )
             ind_in_front += 1
             if ind_in_front >= len(Fronts[front_ind]):
                 front_ind += 1
                 ind_in_front = 0
-       
+        
+        self.P = np.array(self.P)
+        self.P_y1 = np.array(self.P_y1)
+        self.P_y2 = np.array(self.P_y2)
+        
         '''
         Given the new P, use tournament selection, mutation and crossover to create Q
         '''        
@@ -362,102 +312,110 @@ class MOGA():
         if not N % self.COMM.size == 0:
             raise NameError('Population size must be an integer multiple of the number of processors.')
         
-        N_share = N / self.COMM.size                        # self.COMM.size should divide N
-        
-        
-        Q_share = []
-        candidate_indices = P_indices
-#        candidate_indices = range( len( R ) )
+        my_N = N / self.COMM.size                        # self.COMM.size should divide N
+        my_Q = np.array([])
+        my_Q_y1 = []
+        my_Q_y2 = []
+
         # Mutation: Tournament select parents and mutate to create children
-        while len(Q_share) < int(N_share * frac_mutate):
+        while len(my_Q) < int(my_N * frac_mutate) * N_c:
             
-            contestants = random.sample(candidate_indices, 2)      
+            contestants = random.sample(P_indices, 2)      
             if ranks[contestants[0]] < ranks[contestants[1]]:
-                chosen_one = R[contestants[0]]
+                chosen_one = contestants[0]
             elif ranks[contestants[1]] < ranks[contestants[0]]:
-                chosen_one = R[contestants[1]]
+                chosen_one = contestants[1]
             else:
                 if dist_met[contestants[0]] <= dist_met[contestants[1]]:
-                    chosen_one = R[contestants[0]]
+                    chosen_one = contestants[0]
                 else:
-                    chosen_one = R[contestants[1]]
+                    chosen_one = contestants[1]
 
-            chosen_one = chosen_one.copy_data()
-            chosen_one.mutate(mutation_severity)
-            Q_share.append( chosen_one )
+            new_candidate = self.mutate( R[chosen_one,:] )
+            my_Q = np.hstack([my_Q, new_candidate])
+            if np.array_equal(new_candidate, R[chosen_one,:]):      # Mutation may not have changed, so we do not reevaluate the objective functions
+                my_Q_y1.append(R_y1[chosen_one])
+                my_Q_y2.append(R_y2[chosen_one])
+            else:
+                OFs = self.eval_obj.eval_x(new_candidate)
+                my_Q_y1.append(OFs[0])
+                my_Q_y2.append(OFs[1])
           
         # Crossover: Crossover parents to create children
-        while len(Q_share) < N_share:
+        while len(my_Q) < my_N * N_c:
             
             # Tournament select to choose Mom
-            contestants = random.sample(candidate_indices, 2)    
+            contestants = random.sample(P_indices, 2)    
             if ranks[contestants[0]] < ranks[contestants[1]]:
-                Mom = R[contestants[0]]
+                Mom = R[contestants[0],:]
             elif ranks[contestants[1]] < ranks[contestants[0]]:
-                Mom = R[contestants[1]]
+                Mom = R[contestants[1],:]
             else:
                 if dist_met[contestants[0]] <= dist_met[contestants[1]]:
-                    Mom = R[contestants[0]]
+                    Mom = R[contestants[0],:]
                 else:
-                    Mom = R[contestants[1]]
+                    Mom = R[contestants[1],:]
             
             # Tournament select to choose Dad
-            contestants = random.sample(candidate_indices, 2)
+            contestants = random.sample(P_indices, 2)
             if ranks[contestants[0]] < ranks[contestants[1]]:
-                Dad = R[contestants[0]]
+                Dad = R[contestants[0],:]
             elif ranks[contestants[1]] < ranks[contestants[0]]:
-                Dad = R[contestants[1]]
+                Dad = R[contestants[1],:]
             else:
                 if dist_met[contestants[0]] <= dist_met[contestants[1]]:
-                    Dad = R[contestants[0]]
+                    Dad = R[contestants[0],:]
                 else:
-                    Dad = R[contestants[1]]
+                    Dad = R[contestants[1],:]
             
             # Crossover Mom and Dad to create a child
-            child1 = Dad.crossover(Mom)
-            child1.mutate(mutation_severity)
-            Q_share.append( child1 )
-            if len(Q_share) < N_share:                     # Crossover the other way if there is still room
-                child2 = Mom.crossover(Dad)
-                child2.mutate(mutation_severity)
-                Q_share.append( child2 )
+            child1 = self.crossover(Dad, Mom)
+            child1 = self.mutate(child1)
+            my_Q = np.hstack([my_Q, child1])
+            OFs = self.eval_obj.eval_x(child1)
+            my_Q_y1.append(OFs[0])
+            my_Q_y2.append(OFs[1])
+            
+            if len(my_Q) < my_N * N_c:                     # Crossover the other way if there is still room
+                child2 = self.crossover(Mom, Dad)
+                child2 = self.mutate(child2)
+                my_Q = np.hstack([my_Q, child2])
+                OFs = self.eval_obj.eval_x(child2)
+                my_Q_y1.append(OFs[0])
+                my_Q_y2.append(OFs[1])
 
-        # Could be done with allgather, but I'm not sure about the syntax
-        #for destination in range(self.COMM.size):
-        #    self.Q = MPI.COMM_WORLD.gather(Q_share, root=destination)
-        self.Q = self.COMM.allgather( Q_share )
-
-        # Flatten list of lists.
-        self.Q = [_i for temp in self.Q for _i in temp]
+        # Convert to numpy arrays
+        my_Q_y1 = np.array(my_Q_y1)
+        my_Q_y2 = np.array(my_Q_y2)
+        
+        self.Q_y1 = np.zeros(N, dtype='d')
+        self.Q_y2 = np.zeros(N, dtype='d')
+        self.Q = np.empty(N*N_c, dtype='d')
+        
+        # Allgather the x values in Q as well as the objective function evaluations
+        self.COMM.Allgather( [my_Q_y1, MPI.DOUBLE], [self.Q_y1, MPI.DOUBLE] )
+        self.COMM.Allgather( [my_Q_y2, MPI.DOUBLE], [self.Q_y2, MPI.DOUBLE] )
+        self.COMM.Allgather( [my_Q, MPI.DOUBLE], [self.Q, MPI.DOUBLE] )
+        
+        self.Q = self.Q.reshape([N, N_c])
             
     
-    def plot_pop(self, fname = None, gen_num = None, n_obj = 2):
+    def plot_pop(self, fname = None, gen_num = None):
         
         '''
         Plot the objective function values of each individual in the population
         '''    
 
-        grades = [[0, 0] for i in range(len(self.P))]
-        for i in range(len(self.P)):
-            grades[i] = self.P[i].get_OFs()
+        if self.P_y1 is None or self.P_y2 is None:
+            raise NameError('Population must be evaluated before plotting.')
+        
+        plt.plot(self.P_y1, self.P_y2, marker='o', color = 'k', linestyle = 'None')       # population
+        plt.xlabel('$y_1$', size=24)
+        plt.ylabel('$y_2$', size=24)
             
-        fitnesses = np.array(grades)
-
-        if n_obj == 2:
-
-            plt.plot(fitnesses[:,0].reshape(-1,1), fitnesses[:,1].reshape(-1,1), marker='o', color = 'k', linestyle = 'None')       # population
-            plt.xlabel('$y_1$', size=24)
-            plt.ylabel('$y_2$', size=24)
+    #    plt.xlim([-4, 4])
+    #    plt.ylim([-4, 4])
             
-    #        plt.xlim([-4, 4])
-    #        plt.ylim([-4, 4])
-            
-        elif n_obj == 1:
-            
-            fitnesses = fitnesses[:,1].reshape(-1,1)
-            plt.hist(fitnesses, bins='auto')
-            plt.xlabel('$y$', size=24)
-            plt.ylabel('Relative frequency', size=24)
         
         plt.xticks(size=20)
         plt.yticks(size=20)
@@ -470,5 +428,3 @@ class MOGA():
         else:
             plt.savefig(fname)
             plt.close()
-            
-        # Should also show the x values for the best individual so far

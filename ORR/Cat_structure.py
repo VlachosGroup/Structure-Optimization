@@ -107,14 +107,15 @@ class cat_structure(MOGA_individual):
         Randomize the occupancies in the top layer
         '''
         
+        x_rand = [0 for i in range(len(self.variable_atoms)) ]
+        
         if coverage is None:
             coverage = random.random()
-        n_vacancies = round( coverage * len(self.variable_atoms) )
-        n_vacancies = int(n_vacancies)
-        vacant_sites = random.sample(self.variable_atoms, n_vacancies)
-        for i in vacant_sites:
-            self.defected_graph.remove_vertex(i)
-        self.evaluated = False
+        n_occupancies = int( round( coverage * len(self.variable_atoms) ) )
+        occupied_sites = random.sample(range(len(x_rand)), n_occupancies)
+        for i in occupied_sites:
+            x_rand[i] = 1
+        return x_rand
         
     
     def load_from_file(self, ftoread, d_cut = 0.001):
@@ -151,6 +152,18 @@ class cat_structure(MOGA_individual):
             self.evaluated = False
                 
     
+    def eval_x(self, x):
+    
+        self.evaluated = False
+        # Build the defected graph
+        self.defected_graph = self.template_graph.copy_data()
+        for i in range(len(x)):
+            if x[i] == 0:
+                self.defected_graph.remove_vertex(self.variable_atoms[i])
+        
+        return self.get_OFs()
+        
+    
     def get_OFs(self):
         
         '''
@@ -163,50 +176,6 @@ class cat_structure(MOGA_individual):
             self.evaluated = True
         
         return [self.surf_eng, -self.current_density]
-    
-
-    def mutate(self, sigma):
-        
-        '''
-        Mutates an individual to yield an offspring
-        Used in the genetic algorithm
-        '''
-        
-        n_flipped = 0
-        for atom_to_flip in self.variable_atoms:
-            if np.random.random() < 1.0 / len(self.variable_atoms):
-                self.flip_atom(atom_to_flip)
-                n_flipped += 1
-        
-        if n_flipped > 0:
-            self.evaluated = False
-        
-    
-    def crossover(self, mate):
-        
-        '''
-        Crossover with a mate
-        Return the child
-        '''
-        
-        child = self.copy_data()
-        child.defected_graph = child.template_graph.copy_data()
-        
-        ind = 0
-        for site in child.variable_atoms:
-            
-            if ind < len(child.variable_atoms) / 2:
-                parent = self
-            else:
-                parent = mate
-
-            if not parent.defected_graph.is_node(site):
-                child.defected_graph.remove_vertex(site)
-        
-            ind += 1
-        
-        child.evaluated = False
-        return child
     
     
     def eval_current_density(self, atom_graph = None, normalize = True):
@@ -324,20 +293,16 @@ if __name__ == "__main__":
     random.seed(a=12345)
     np.random.seed(seed=12345)
     os.chdir('/home/vlachos/mpnunez/ORR_GA')
-
-    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 30, dim2 = 30)
     
     '''
     Genetic algorithm optimization
     '''
     
     # Numerical parameters
-    p_count = 208                   # population size, make a multiple of the number of cores ( = 16)
-    n_gens = 10                    # number of generations, can restart if more generations are needed
+    p_count = 208                   # population size, make a multiple of the number of cores ( = 16), use 208
+    n_gens = 10000                    # number of generations, can restart if more generations are needed
     
-    x = MOGA()
-    x.P = [template.copy_data() for i in range(p_count)]
-    x.randomize_pop()
-    x.P[0] = template.copy_data()       # Include the ideal surface in the initial population
-    #x.P[1] = active_opt                 # Put the activity optimum in the initial population as well
-    x.genetic_algorithm(n_gens, n_snaps = 0, n_obj = 2)
+    ga = MOGA()
+    ga.eval_obj = cat_structure(met_name = 'Pt', facet = '111', dim1 = 30, dim2 = 30)
+    ga.P = np.array([ga.eval_obj.randomize() for i in range(p_count)])
+    ga.genetic_algorithm(n_gens, n_snaps = 101)

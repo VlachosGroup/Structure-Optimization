@@ -3,7 +3,7 @@
 #$ -j y
 #$ -N ORR_genetic
 #$ -S /bin/bash
-#$ -pe openmpi-smp 4
+#$ -pe openmpi-smp 16
 # -o ORR.out
 
 # Get our environment setup:
