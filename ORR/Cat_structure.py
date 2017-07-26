@@ -14,7 +14,8 @@ import matplotlib as mat
 import matplotlib.ticker as mtick
 
 import sys
-sys.path.append('C:\Users\mpnun\OneDrive\Documents\\ase')
+#sys.path.append('C:\Users\mpnun\OneDrive\Documents\\ase')
+sys.path.append('/home/vlachos/mpnunez/ase')
 from ase.build import fcc111, fcc100
 from ase.neighborlist import NeighborList
 from ase.io import read
@@ -322,40 +323,21 @@ if __name__ == "__main__":
     os.system('clear')
     random.seed(a=12345)
     np.random.seed(seed=12345)
-#    os.chdir('C:\Users\mpnun\Desktop\GA_run')
-    os.chdir('C:\Users\mpnun\Desktop\GA_run_multi')
-    
-    best_xsd = 'C:\Users\mpnun\Desktop\GA_run\most_active.xsd'
+    os.chdir('/home/vlachos/mpnunez/ORR_GA')
 
-    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 12, dim2 = 12)
-    
-    #active_opt = cat_structure(met_name = 'Pt', facet = '111', dim1 = 10, dim2 = 10)
-    #active_opt.load_from_file(best_xsd)
-#    ofs = active_opt.get_OFs()
-#    print 'Surface energy: ' + str(ofs[0]) + ' J/m^2'
-#    print 'Current density: ' + str(ofs[1]) + ' mA/cm^2'
-#    raise NameError('stop')
-    
+    template = cat_structure(met_name = 'Pt', facet = '111', dim1 = 30, dim2 = 30)
     
     '''
     Genetic algorithm optimization
     '''
     
     # Numerical parameters
-    p_count = 50                   # population size
-    n_gens = 1000                    # number of generations
+    p_count = 208                   # population size, make a multiple of the number of cores ( = 16)
+    n_gens = 10                    # number of generations, can restart if more generations are needed
     
     x = MOGA()
     x.P = [template.copy_data() for i in range(p_count)]
     x.randomize_pop()
-    x.P[0] = template.copy_data()       # Make sure that the ideal surface is included in the initial population
+    x.P[0] = template.copy_data()       # Include the ideal surface in the initial population
     #x.P[1] = active_opt                 # Put the activity optimum in the initial population as well
-    x.genetic_algorithm(n_gens, n_snaps = 11, n_obj = 2)
-    
-#    x.P[0].show('most_active', fmat = 'xsd')
-
-    i = 1
-    for indiv in x.P:
-        indiv.show(i)
-        indiv.show(i, fmat = 'xsd')
-        i += 1
+    x.genetic_algorithm(n_gens, n_snaps = 0, n_obj = 2)

@@ -9,7 +9,7 @@ import numpy as np
 import random
 import time
 import matplotlib.pyplot as plt
-
+from mpi4py import MPI
 
 class MOGA_individual(object):
     
@@ -54,7 +54,8 @@ class MOGA():
         
         self.P = None                       # Population: List of individuals
         self.Q = None                       # candidate population        
-
+        self.COMM = None                    # object for MPI parallelization
+        
 
     def randomize_pop(self):
         
@@ -75,6 +76,12 @@ class MOGA():
         Optimize the population using a genetic algorithm
         '''
         
+        self.COMM = MPI.COMM_WORLD
+        
+        # Set different random seeds for each processor
+        random.seed(a=12345 + self.COMM.rank)
+        np.random.seed(seed=12345 + self.COMM.rank)
+        
         # Initialize list of steps for taking snapshots
         # The population will be shown after the mutation in the listed generations
         # "After generation 0" gives the initial population
@@ -86,13 +93,16 @@ class MOGA():
         else:
             snap_record = [int( float(i) / (n_snaps - 1) * ( n_gens ) ) for i in range(n_snaps)]
 
-        if n_snaps > 0:
+        if n_snaps > 0 and COMM.rank == 0:
             snap_ind += 1
             self.plot_pop(fname = 'pop_pic_1.png', gen_num = 0, n_obj = n_obj)
     
         CPU_start = time.time()
         for i in xrange(n_gens):
-            print 'Generation ' + str(i+1)
+        
+            if self.COMM.rank == 0:          # Report progress
+                print 'Generation ' + str(i+1)
+                
             # Evolve population
             if n_obj == 1:
                 self.evolve_single(0.2 * (1 - i / n_gens))
@@ -100,12 +110,18 @@ class MOGA():
                 self.evolve(0.2 * (1 - i / n_gens))
             
             # Show the population if it is a snapshot generation
-            if i+1 in snap_record:
+            if i+1 in snap_record and COMM.rank == 0:
                 snap_ind += 1
                 self.plot_pop(fname = 'pop_pic_' + str(snap_ind) + '.png' , gen_num = i+1, n_obj = n_obj)
                 
         CPU_end = time.time()
         print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
+        
+        #i = 1
+        #for indiv in x.P:
+        #    indiv.show(i)
+        #    indiv.show(i, fmat = 'xsd')
+        #    i += 1
         
         
     def evolve_single(self, mutation_severity, frac_mutate = 0.9, frac_elite = 0.1):
@@ -116,7 +132,6 @@ class MOGA():
         retain: top fraction to keep
         random_select: 
         mutate: 
-        Uses the NSGA-II algorithm from K. Deb, S. Pratab, S. Agarwal, and T. Meyarivan, IEEE Trans. Evol. Comput. 6, 182 (2002).
         '''    
 
         N = len(self.P)
@@ -216,7 +231,7 @@ class MOGA():
 #            indiv.mutate(mutation_severity)
                 
 
-    def evolve(self, mutation_severity, frac_mutate = 0.8, frac_elite = 1.0): # frac_elite is probably way too high
+    def evolve(self, mutation_severity, frac_mutate = 0.8):   
     
         '''
         Execute one generation of the genetic algorithm
@@ -227,6 +242,8 @@ class MOGA():
         Uses the NSGA-II algorithm from K. Deb, S. Pratab, S. Agarwal, and T. Meyarivan, IEEE Trans. Evol. Comput. 6, 182 (2002).
         '''    
 
+        
+        
         N = len(self.P)
         R = self.P
         if not self.Q is None:          # self.Q is None for the 1st generation
@@ -329,7 +346,7 @@ class MOGA():
         available = range( len( R ) )
         front_ind = 0
         ind_in_front = 0
-        while len(self.P) < int( N * frac_elite):
+        while len(self.P) < N:
             self.P.append( R[ Fronts[front_ind][ind_in_front] ] )
             P_indices.append( Fronts[front_ind][ind_in_front] )
             available.remove( Fronts[front_ind][ind_in_front] )
@@ -338,37 +355,21 @@ class MOGA():
                 front_ind += 1
                 ind_in_front = 0
        
-        # fill in the rest of self.P with more diverse individuals via tournament selection        
-        while len(self.P) < N:
-            
-            if len(available) == 1:
-                chosen_one = available[0]
-            else:
-                contestants = random.sample(available, 2)      
-                if ranks[contestants[0]] < ranks[contestants[1]]:
-                    chosen_one = contestants[0]
-                elif ranks[contestants[1]] < ranks[contestants[0]]:
-                    chosen_one = contestants[1]
-                else:
-                    if dist_met[contestants[0]] <= dist_met[contestants[1]]:
-                        chosen_one = contestants[0]
-                    else:
-                        chosen_one = contestants[1]
-                        
-            self.P.append( R[ chosen_one ] )
-            P_indices.append( chosen_one )
-            available.remove( chosen_one )
-            
-        
         '''
         Given the new P, use tournament selection, mutation and crossover to create Q
-        '''
+        '''        
         
-        self.Q = []
+        if not N % self.COMM.size == 0:
+            raise NameError('Population size must be an integer multiple of the number of processors.')
+        
+        N_share = N / self.COMM.size                        # self.COMM.size should divide N
+        
+        
+        Q_share = []
         candidate_indices = P_indices
 #        candidate_indices = range( len( R ) )
         # Mutation: Tournament select parents and mutate to create children
-        while len(self.Q) < int(N * frac_mutate):
+        while len(Q_share) < int(N_share * frac_mutate):
             
             contestants = random.sample(candidate_indices, 2)      
             if ranks[contestants[0]] < ranks[contestants[1]]:
@@ -383,10 +384,10 @@ class MOGA():
 
             chosen_one = chosen_one.copy_data()
             chosen_one.mutate(mutation_severity)
-            self.Q.append( chosen_one )
+            Q_share.append( chosen_one )
           
         # Crossover: Crossover parents to create children
-        while len(self.Q) < N:
+        while len(Q_share) < N_share:
             
             # Tournament select to choose Mom
             contestants = random.sample(candidate_indices, 2)    
@@ -415,12 +416,20 @@ class MOGA():
             # Crossover Mom and Dad to create a child
             child1 = Dad.crossover(Mom)
             child1.mutate(mutation_severity)
-            self.Q.append( child1 )
-            if len(self.Q) < N:                     # Crossover the other way if there is still room
+            Q_share.append( child1 )
+            if len(Q_share) < N_share:                     # Crossover the other way if there is still room
                 child2 = Mom.crossover(Dad)
                 child2.mutate(mutation_severity)
-                self.Q.append( child2 )
-    
+                Q_share.append( child2 )
+
+        # Could be done with allgather, but I'm not sure about the syntax
+        #for destination in range(self.COMM.size):
+        #    self.Q = MPI.COMM_WORLD.gather(Q_share, root=destination)
+        self.Q = self.COMM.allgather( Q_share )
+
+        # Flatten list of lists.
+        self.Q = [_i for temp in self.Q for _i in temp]
+            
     
     def plot_pop(self, fname = None, gen_num = None, n_obj = 2):
         
