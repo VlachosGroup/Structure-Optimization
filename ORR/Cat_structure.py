@@ -13,9 +13,6 @@ import matplotlib.pyplot as plt
 import matplotlib as mat
 import matplotlib.ticker as mtick
 
-import sys
-#sys.path.append('C:\Users\mpnun\OneDrive\Documents\\ase')
-sys.path.append('/home/vlachos/mpnunez/ase')
 from ase.build import fcc111, fcc100
 from ase.neighborlist import NeighborList
 from ase.io import read
@@ -24,9 +21,8 @@ from ase.io import write
 from metal import metal
 from ORR import ORR_rate
 from graph_theory import Graph
-from Genetic import MOGA, MOGA_individual
 
-class cat_structure(MOGA_individual):
+class cat_structure(MOGA_evaluator):
     
     '''
     Catalyst structure with defects
@@ -259,12 +255,20 @@ class cat_structure(MOGA_individual):
                     self.defected_graph.add_edge([ind, neighb])
     
 
-    def show(self, n_struc, fmat = 'picture'):
+    def show(self, x = None, n_struc = 1, fmat = 'picture'):
                 
         '''
         Print image of surface
         '''        
         
+        # Build defected graph
+        if not x is None:
+            self.defected_graph = self.template_graph.copy_data()
+            for i in range(len(x)):
+                if x[i] == 0:
+                    self.defected_graph.remove_vertex(self.variable_atoms[i])
+        
+        # Build ASE atoms object from defected graph
         defect_atoms_obj = self.get_defected_mols()
         
         coords = defect_atoms_obj.get_positions()
@@ -287,22 +291,3 @@ class cat_structure(MOGA_individual):
             write('structure_' + str(n_struc) + '.xsd', defect_atoms_obj, format = fmat )
 
         
-if __name__ == "__main__":
-    
-    os.system('clear')
-    random.seed(a=12345)
-    np.random.seed(seed=12345)
-    os.chdir('/home/vlachos/mpnunez/ORR_GA')
-    
-    '''
-    Genetic algorithm optimization
-    '''
-    
-    # Numerical parameters
-    p_count = 208                   # population size, make a multiple of the number of cores ( = 16), use 208
-    n_gens = 10000                    # number of generations, can restart if more generations are needed
-    
-    ga = MOGA()
-    ga.eval_obj = cat_structure(met_name = 'Pt', facet = '111', dim1 = 30, dim2 = 30)
-    ga.P = np.array([ga.eval_obj.randomize() for i in range(p_count)])
-    ga.genetic_algorithm(n_gens, n_snaps = 101)

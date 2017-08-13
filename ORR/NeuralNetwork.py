@@ -19,8 +19,9 @@ class NeuralNetwork():
     
     def __init__(self):
         
-        self.X = None
-        self.Y = None
+        self.X = None           # numpy array of x values
+        self.Y = None           # numpy array of y values
+        self.Y_nn = None        # y values predicted by the neural network
         self.NNModel = None
 
 
@@ -30,7 +31,7 @@ class NeuralNetwork():
         Compute value for the model as trained so far
         '''
 
-        return self.NNModel.predict( np.array( [ x ] ) )[0]
+        return self.NNModel.predict( x )
     
     
     def refine(self, X_plus, Y_plus):
@@ -50,8 +51,38 @@ class NeuralNetwork():
         
         # Regress the neural network
         self.train()
+        self.Y_nn = self.NNModel.predict( self.X )      # store predicted values
 
 
+    def plot_parity(self, fname = 'parity.png', logscale = 'False'):
+    
+        '''
+        Plot a parity plot for the data trained so far
+        '''
+    
+        mat.rcParams['mathtext.default'] = 'regular'
+        mat.rcParams['text.latex.unicode'] = 'False'
+        mat.rcParams['legend.numpoints'] = 1
+        mat.rcParams['lines.linewidth'] = 2
+        mat.rcParams['lines.markersize'] = 12
+        
+        plt.figure()
+        plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')
+        
+        #plt.xticks(size=20)
+        #plt.yticks(size=20)
+        plt.xlabel('High fidelity', size=24)
+        plt.ylabel('Neural network', size=24)
+        #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
+        plt.tight_layout()
+        
+        if logscale:
+            plt.yscale('log')
+        
+        plt.savefig(fname)
+        plt.close()
+        
+        
     def train(self, regularization_parameter = 0.1):
 
         '''
@@ -72,7 +103,7 @@ class NeuralNetwork():
         test_set_size = 0.2
         
         # Neural network set up
-        hidden_layer_sizes = (20,) # (#perceptons in layer 1, #perceptons in layer 2, #perceptons in layer 3, ...)
+        hidden_layer_sizes = (20,) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
 
         '''
         Scale Data

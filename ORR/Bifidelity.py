@@ -29,8 +29,6 @@ class Bifidelity():
         
         self.pop = None                     # List of individuals
         self.fitnesses = None               # Fitness values for the individuals in the population
-        self.training_X = None              # Set of training structures used to regress the low fidelity model
-        self.training_Y = None              # Training output
         self.low_fid = None                 # Low fidelity model trained with data
         self.high_fid_calls = 0
 
