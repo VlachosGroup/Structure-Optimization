@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mat
 import matplotlib.ticker as mtick
 
+import sys
+sys.path.append('C:\Users\mpnun\OneDrive\Documents\\ase')
 from ase.build import fcc111, fcc100
 from ase.neighborlist import NeighborList
 from ase.io import read
@@ -22,7 +24,7 @@ from metal import metal
 from ORR import ORR_rate
 from graph_theory import Graph
 
-class cat_structure(MOGA_evaluator):
+class cat_structure():
     
     '''
     Catalyst structure with defects

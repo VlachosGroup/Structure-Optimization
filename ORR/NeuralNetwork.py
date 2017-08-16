@@ -14,6 +14,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 
+import matplotlib.pyplot as plt
+import matplotlib as mat
+import matplotlib.ticker as mtick
 
 class NeuralNetwork():
     
@@ -21,6 +24,9 @@ class NeuralNetwork():
         
         self.X = None           # numpy array of x values
         self.Y = None           # numpy array of y values
+        self.Ymeans = None
+        self.Ystds = None
+        
         self.Y_nn = None        # y values predicted by the neural network
         self.NNModel = None
 
@@ -31,7 +37,12 @@ class NeuralNetwork():
         Compute value for the model as trained so far
         '''
 
-        return self.NNModel.predict( x )
+        Ypred = self.NNModel.predict( x )
+    
+        for i in range(len(self.Ymeans)):
+            Ypred[:,i] = self.Ystds[i] * Ypred[:,i] + self.Ymeans[i] * np.ones(Ypred[:,i].shape)
+            
+        return Ypred
     
     
     def refine(self, X_plus, Y_plus):
@@ -40,6 +51,8 @@ class NeuralNetwork():
         Add new data to the training set and retrain
         X_plus and Y_plus need to be 2-D matrices of data
         '''
+        
+        self.NNModel = None
         
         # Append to existing data sets
         if self.X is None or self.Y is None:
@@ -51,10 +64,10 @@ class NeuralNetwork():
         
         # Regress the neural network
         self.train()
-        self.Y_nn = self.NNModel.predict( self.X )      # store predicted values
+        self.Y_nn = self.predict( self.X )      # store predicted values
 
 
-    def plot_parity(self, fname = 'parity.png', logscale = 'False'):
+    def plot_parity(self, fname = 'parity.png', title = None, logscale = False):
     
         '''
         Plot a parity plot for the data trained so far
@@ -67,19 +80,45 @@ class NeuralNetwork():
         mat.rcParams['lines.markersize'] = 12
         
         plt.figure()
-        plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')
+        plt.plot(self.Y[:,0], self.Y_nn[:,0], 'o')  # Can do this for all outputs
+        plt.plot( [1.4, 2.6], [1.4, 2.6], '-', color = 'k')  # Can do this for all outputs
         
         #plt.xticks(size=20)
         #plt.yticks(size=20)
         plt.xlabel('High fidelity', size=24)
         plt.ylabel('Neural network', size=24)
+        plt.xlim([1.4,2.6])
+        plt.ylim([1.4,2.6])
+        if not title is None:
+            plt.title(title, size = 24)
         #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
         plt.tight_layout()
         
         if logscale:
             plt.yscale('log')
         
-        plt.savefig(fname)
+        plt.savefig('Y1_' + fname)
+        plt.close()
+        
+        plt.figure()
+        plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')  # Can do this for all outputs
+        plt.plot([-70, 0], [-70, 0], '-', color = 'k')
+        
+        #plt.xticks(size=20)
+        #plt.yticks(size=20)
+        plt.xlabel('High fidelity', size=24)
+        plt.ylabel('Neural network', size=24)
+        plt.xlim([-70,0])
+        plt.ylim([-70,0])
+        if not title is None:
+            plt.title(title, size = 24)
+        #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
+        plt.tight_layout()
+        
+        if logscale:
+            plt.yscale('log')
+        
+        plt.savefig('Y2_' + fname)
         plt.close()
         
         
@@ -97,13 +136,13 @@ class NeuralNetwork():
         '''
         # data scaling: involves centering and standardizing data
 #        Data_scaling = True
-        Data_scaling = False
         
         # Train:test split cross validation set up
         test_set_size = 0.2
         
         # Neural network set up
-        hidden_layer_sizes = (20,) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
+        #N_nodes = self.X.shape[1]
+        hidden_layer_sizes = (288,288) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
 
         '''
         Scale Data
@@ -112,23 +151,20 @@ class NeuralNetwork():
         X = copy.deepcopy(self.X)
         Y = copy.deepcopy(self.Y)
         
-        if Data_scaling:
+        # Normalize the y values
+        self.Ymeans = []
+        self.Ystds = []
+        for i in range(Y.shape[1]):
+            self.Ymeans.append( np.mean( Y[:,i] ) )
+            self.Ystds.append( np.std( Y[:,i] ) )
             
-            # Scaling options
-            centering = True
-            standardization = True
+            Y[:,i] = Y[:,i] - self.Ymeans[-1] * np.ones(Y[:,i].shape)
             
-            # scaling X
-            X_scaler = StandardScaler(with_mean = centering, with_std = standardization)
-            X_scaler.fit(X)
-            X = X_scaler.transform(X)
-            
-            # scaling Y
-            Y_scaler = StandardScaler(with_mean = centering, with_std = standardization)
-            Y_scaler.fit(Y)
-            Y = Y_scaler.transform(Y)
-            Y = Y.reshape(-1)
-            
+            # Divide by standard deviation if it is greater than zero
+            if self.Ystds[-1] > 0:
+                Y[:,i] = Y[:,i] / self.Ystds[-1]
+        
+        
         '''
         Perform regression
         '''
@@ -137,7 +173,10 @@ class NeuralNetwork():
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_set_size, random_state=1)
             
         ## Build Model
-        self.NNModel = MLPRegressor(activation = 'logistic', solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
+        self.NNModel = MLPRegressor(activation = 'identity', solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
         
         ## Fit
-        self.NNModel.fit(X_train, Y_train)
+#        self.NNModel.fit(X_train, Y_train)
+        self.NNModel.fit(X, Y)
+        
+        print 'Trained neural network with ' + str(X.shape[0]) + ' data points.'

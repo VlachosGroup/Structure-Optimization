@@ -603,10 +603,16 @@ class Bifidelity(MOGA):
         Initialize with an empty population
         '''
         
-        super(SOGA, self).__init__()
+        super(Bifidelity, self).__init__()
         
-        self.eval_obj_approx = None        # Neural network object used to evaluate an approximate fitness function
+        self.nn_surrogate = None        # Neural network object used to evaluate an approximate fitness function
+        #self.Q = None                   # I don't know why this isn't getting inherited properly
         
+        self.evaluated_high_P = None        # Whether each individual in P has been evaluated with the high-fidelity model
+        self.evaluated_high_Q = None        # Whether each individual in Q has been evaluated with the high-fidelity model
+        self.high_fidelity_evals = 0        # Number of high fidelity evaluations
+        self.low_fidelity_evals = 0         # Number of low fidelity evaluations
+    
     
     def genetic_algorithm(self, n_gens, frac_controlled = 0.1, n_snaps = 0):
         
@@ -615,7 +621,7 @@ class Bifidelity(MOGA):
         Optimize the population using a genetic algorithm
         '''
         
-        self.eval_obj_approx = NeuralNetwork()
+        
         
         # Set different random seeds for each processor
         random.seed(a=12345)
@@ -624,6 +630,7 @@ class Bifidelity(MOGA):
         # Initialize list of steps for taking snapshots
         # The population will be shown after the mutation in the listed generations
         # "After generation 0" gives the initial population
+        n_snaps = min([ n_snaps, n_gens + 1])
         snap_ind = 0
         if n_snaps == 0:
             snap_record = []
@@ -632,22 +639,38 @@ class Bifidelity(MOGA):
         else:
             snap_record = [int( float(i) / (n_snaps - 1) * ( n_gens ) ) for i in range(n_snaps)]
 
+        # Identify controlled generations
+        n_controlled = int(n_gens * frac_controlled)
+        control_ind = 0
+        if n_controlled == 0:
+            controlled_gens = []
+        elif n_controlled == 1:
+            controlled_gens = [0]
+        else:
+            controlled_gens = [int( float(i+1) * n_gens / n_controlled ) for i in range(n_controlled)]
+            
+
         # Evaluate individuals in P before the 1st generation
         self.P_y1 = []
         self.P_y2 = []
         for p in self.P:
             OFs = self.eval_obj.eval_x(p)
+            self.high_fidelity_evals += 1
             self.P_y1.append(OFs[0])
             self.P_y2.append(OFs[1])
+        self.evaluated_high_P = [True for i in range(self.P.shape[0])]
             
         self.P_y1 = np.array(self.P_y1)
         self.P_y2 = np.array(self.P_y2)
         
-        self.eval_obj_approx.refine(self.P, np.transpose( np.vstack([self.P_y1, self.P_y2]) ) )
-        self.eval_obj_approx.plot_parity()
+        # Train neural network on the initial population
+        if frac_controlled < 1.:
+            control_ind += 1
+            self.nn_surrogate = NeuralNetwork()
+            self.nn_surrogate.refine(self.P, np.transpose( np.vstack([self.P_y1, self.P_y2]) ) )
+            self.nn_surrogate.plot_parity('parity_1.png', title = 'Generation 0')
         
-        raise NameError('stop')
-            
+        # Print population snapshot
         if n_snaps > 0:
             snap_ind += 1
             self.plot_pop(fname = 'pop_pic_1.png', gen_num = 0)
@@ -655,23 +678,239 @@ class Bifidelity(MOGA):
     
         CPU_start = time.time()
         for i in xrange(n_gens):
-        
-            if self.COMM.rank == 0:          # Report progress
-                print 'Generation ' + str(i+1)
+            
+            print 'Generation ' + str(i+1)
                 
             # Evolve population
-            self.evolve()
+            if i+1 in controlled_gens:
+                control_ind += 1
+                self.evolve(controlled = True)
+                if not self.nn_surrogate is None:
+                    self.nn_surrogate.plot_parity(fname = 'parity_' + str(control_ind) +'png', title = 'Generation ' + str(i+1))
+            else:
+                self.evolve(controlled = False)
             
             # Show the population if it is a snapshot generation
-            if i+1 in snap_record and self.COMM.rank == 0:
+            if i+1 in snap_record:
                 snap_ind += 1
                 self.plot_pop(fname = 'pop_pic_' + str(snap_ind) + '.png' , gen_num = i+1)
                 self.eval_obj.show(x = self.P[0,:], n_struc = snap_ind, fmat = 'picture')
                 
         CPU_end = time.time()
-        if self.COMM.rank == 0:
-            print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
+        print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
+        print str(self.high_fidelity_evals) + ' high fidelity evaluations.'
         
     
-    def evolve(self):
-        pass
+    def evolve(self, elite_fraction = 0.5, frac_mutate = 0.0, controlled = False):   
+    
+        '''
+        Execute one generation of the genetic algorithm
+        Evolve the population using metation and crossover
+        retain: top fraction to keep
+        random_select: 
+        mutate: 
+        '''    
+
+        N = self.P.shape[0]         # number of individuals in the population
+        N_c = self.P.shape[1]       # number of bits for each individual
+        
+        # Combine P and Q into R (Q is an empty list in the first generation)
+        if self.Q is None:
+            R = self.P
+            R_y1 = self.P_y1
+            R_y2 = self.P_y2
+            R_evaluated_high = self.evaluated_high_P
+        else:
+            R = np.vstack([self.P, self.Q])
+            R_y1 = np.hstack([self.P_y1, self.Q_y1])
+            R_y2 = np.hstack([self.P_y2, self.Q_y2])
+            R_evaluated_high = self.evaluated_high_P + self.evaluated_high_Q
+
+        # Given R, we need to dermine the new P
+
+        '''
+        Assign distance metric for each individual in each front
+        '''
+        # Extract fitness values for R
+        graded_pop = [ [ 0, 0, i ] for i in range( R.shape[0] ) ]
+        for i in range( R.shape[0] ):
+            graded_pop[i][0] = R_y1[i]
+            graded_pop[i][1] = R_y2[i]
+            
+        graded_pop_arr = np.array( graded_pop )    
+        sorted_data = graded_pop_arr[graded_pop_arr[:, 1].argsort()]        # sort according to data in the m'th objective
+            
+        
+        '''
+        Selection: Select individuals for the new P
+        '''
+        
+        self.P = []
+        self.P_y1 = []
+        self.P_y2 = []
+        self.evaluated_high_P = []
+            
+        ind = 0
+
+        while len(self.P) < N:
+        
+            ind_chosen = int(sorted_data[ind, -1])
+            self.P.append( R[ ind_chosen, : ] )
+            self.P_y1.append( R_y1[ ind_chosen ] )
+            self.P_y2.append( R_y2[ ind_chosen ] )
+            self.evaluated_high_P.append( R_evaluated_high[ ind_chosen ] )
+            
+            ind += 1
+        
+        self.P = np.array(self.P)
+        self.P_y1 = np.array(self.P_y1)
+        self.P_y2 = np.array(self.P_y2)
+        
+        '''
+        Given the new P, use tournament selection, mutation and crossover to create Q
+        '''        
+        
+        my_N = N
+        my_Q = np.array([])
+        my_Q_y1 = []
+        my_Q_y2 = []
+
+        # Mutation: Tournament select parents and mutate to create children
+        while len(my_Q) < int(my_N * frac_mutate) * N_c:
+            
+            contestants = random.sample(range(N), 2)      
+            if self.P_y2[contestants[0]] < self.P_y2[contestants[1]]:
+                chosen_one = contestants[0]
+            else:
+                chosen_one = contestants[1]
+
+            new_candidate = self.mutate( self.P[chosen_one,:] )
+            my_Q = np.hstack([my_Q, new_candidate])
+            if np.array_equal(new_candidate, self.P[chosen_one,:]):      # Mutation may not have changed, so we do not reevaluate the objective functions
+                my_Q_y1.append(R_y1[chosen_one])
+                my_Q_y2.append(R_y2[chosen_one])
+            else:
+                if controlled:
+                    OFs = self.eval_obj.eval_x(new_candidate)
+                    self.high_fidelity_evals += 1
+                    my_Q_y1.append(OFs[0])
+                    my_Q_y2.append(OFs[1])
+                else:
+                    OFs = self.nn_surrogate.predict(new_candidate.reshape(1,-1))
+                    my_Q_y1.append(OFs[0,0])
+                    my_Q_y2.append(OFs[0,1])
+          
+        # Crossover: Crossover parents to create children
+        while len(my_Q) < my_N * N_c:
+            
+            # Tournament select to choose Mom
+            contestants = random.sample(range(N), 2)    
+            if self.P_y2[contestants[0]] < self.P_y2[contestants[1]]:
+                Mom = self.P[contestants[0],:]
+            else:
+                Mom = self.P[contestants[1],:]
+            
+            # Tournament select to choose Dad
+            contestants = random.sample(range(N), 2)
+            if self.P_y2[contestants[0]] < self.P_y2[contestants[1]]:
+                Dad = self.P[contestants[0],:]
+            else:
+                Dad = self.P[contestants[1],:]
+            
+            # Crossover Mom and Dad to create a child
+            children = self.crossover(Dad, Mom)
+            n_diffs = np.sum( np.abs( Mom - Dad ) )
+            child1 = children[0]
+            child2 = children[1]
+            child1 = self.mutate(child1, intensity = 1. + 5. * (1. - n_diffs / N_c) )
+            my_Q = np.hstack([my_Q, child1])
+            if controlled:
+                OFs = self.eval_obj.eval_x(child1)
+                self.high_fidelity_evals += 1
+                my_Q_y1.append(OFs[0])
+                my_Q_y2.append(OFs[1])
+            else:
+                OFs = self.nn_surrogate.predict(child1.reshape(1,-1))
+                my_Q_y1.append(OFs[0,0])
+                my_Q_y2.append(OFs[0,1])
+            
+            if len(my_Q) < my_N * N_c:                     # Crossover the other way if there is still room
+                child2 = self.mutate(child2, intensity = 1. + 5. * (1. - n_diffs / N_c) )
+                my_Q = np.hstack([my_Q, child2])
+                if controlled:
+                    OFs = self.eval_obj.eval_x(child1)
+                    self.high_fidelity_evals += 1
+                    my_Q_y1.append(OFs[0])
+                    my_Q_y2.append(OFs[1])
+                else:
+                    OFs = self.nn_surrogate.predict(child2.reshape(1,-1))
+                    my_Q_y1.append(OFs[0,0])
+                    my_Q_y2.append(OFs[0,1])
+
+        # Convert to numpy arrays
+        my_Q_y1 = np.array(my_Q_y1)
+        my_Q_y2 = np.array(my_Q_y2)
+        
+        # Allgather the x values in Q as well as the objective function evaluations
+        self.Q_y1 = my_Q_y1
+        self.Q_y2 = my_Q_y2
+        self.Q = my_Q
+        
+        self.Q = self.Q.reshape([N, N_c])
+        
+        # If it is a controlled generation, evaluate P and Q with the full model
+        # Add their data to refine the neural network
+        if controlled:
+            
+            self.evaluated_high_Q = [True for i in xrange(N)]
+            
+            # Evaluate individuals in P with the full model
+            for indiv in xrange(N):
+                if not self.evaluated_high_P[indiv]:
+                    OFs = self.eval_obj.eval_x(self.P[indiv,:])
+                    self.P_y1[indiv] = OFs[0]
+                    self.P_y2[indiv] = OFs[1]
+                    self.evaluated_high_P[indiv] = True           
+            
+            # Refine surrogate model
+            if not self.nn_surrogate is None:
+                # Prepare new training data
+                newX = np.vstack([self.P, self.Q])
+                newY1 = np.hstack([self.P_y1, self.Q_y1])
+                newY2 = np.hstack([self.P_y2, self.Q_y2])
+                newY = np.transpose( np.vstack( [newY1, newY2] ) )
+                
+                self.nn_surrogate.refine(newX, newY )
+                
+        else:
+            self.evaluated_high_Q = [False for i in xrange(N)]
+        
+        
+    def plot_pop(self, fname = None, gen_num = None):
+        
+        '''
+        Plot the objective function values of each individual in the population
+        '''    
+
+        if self.P_y2 is None:
+            raise NameError('Population must be evaluated before plotting.')
+
+        plt.hist(self.P_y2, len(self.P_y2)/10)
+        plt.xlabel('$y_2$', size=24)
+        plt.ylabel('Relative frequency', size=24)    
+    #   plt.xlim([-4, 4])
+    #   plt.ylim([-4, 4])
+            
+        plt.xticks(size=20)
+        plt.yticks(size=20)
+        plt.xlim([-90,0])
+        plt.ylim([0,60])
+        if not gen_num is None:
+            plt.title('Generation ' + str(gen_num))
+        plt.tight_layout()
+        
+        if fname is None:
+            plt.show()
+        else:
+            plt.savefig(fname)
+            plt.close()

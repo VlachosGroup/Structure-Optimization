@@ -1,1 +1,0 @@
-For practice, coding the example used in Y. Jin, S. Member, M. Olhofer, and B. Sendhoff, 6, 481 (2002).
