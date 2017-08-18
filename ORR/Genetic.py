@@ -669,7 +669,7 @@ class Bifidelity(MOGA):
             self.nn_surrogate = NeuralNetwork()
             self.nn_surrogate.refine(self.P, np.transpose( np.vstack([self.P_y1, self.P_y2]) ) )
             self.nn_surrogate.plot_parity('parity_1.png', title = 'Generation 0')
-        
+
         # Print population snapshot
         if n_snaps > 0:
             snap_ind += 1
@@ -699,6 +699,7 @@ class Bifidelity(MOGA):
         CPU_end = time.time()
         print('Time elapsed: ' + str(CPU_end - CPU_start) + ' seconds')
         print str(self.high_fidelity_evals) + ' high fidelity evaluations.'
+        print 'Best individual score: ' + str(self.P_y2[0])
         
     
     def evolve(self, elite_fraction = 0.5, frac_mutate = 0.0, controlled = False):   

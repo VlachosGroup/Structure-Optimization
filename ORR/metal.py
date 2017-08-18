@@ -49,7 +49,7 @@ class metal:
             raise ValueError(met_name + ' not found in metal database.')
         
         
-    def get_OH_BE(self, GCN):
+    def get_OH_BE(self, GCN):       # Can give this an option to produce random OH and OOH BEs with correlations
         return self.OHslope * GCN + self.OHint
         
         

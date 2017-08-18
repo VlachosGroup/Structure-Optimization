@@ -43,6 +43,7 @@ class cat_structure():
         self.evaluated = False
         self.current_density = None
         self.surf_eng = None
+        self.active_CN = 9                      # CN must be less than or equal to this to be active
         
         if not met_name is None:
         
@@ -54,8 +55,10 @@ class cat_structure():
             
             if facet == '111' or facet == 111:
                 self.atoms_obj_template = fcc111(met_name, size=(dim1, dim2, 4), vacuum=15.0)
+                self.active_CN = 9
             elif facet == '100' or facet == 100:
                 self.atoms_obj_template = fcc100(met_name, size=(dim1, dim2, 4), vacuum=15.0)
+                self.active_CN = 8
             else:
                 raise ValueError(str(facet) + ' is not a valid facet.')
                 
@@ -176,6 +179,27 @@ class cat_structure():
         return [self.surf_eng, -self.current_density]
     
     
+    def get_Nnn(self):
+        '''
+        For each active atom, print the number of nearest neighbors that are also active
+        '''
+        atom_graph = self.defected_graph
+        for i in self.active_atoms:
+            if atom_graph.is_node(i):
+                if atom_graph.get_coordination_number(i) <= self.active_CN:
+                    
+                    gcn = atom_graph.get_generalized_coordination_number(i, 12)
+                    
+                    Nnn = 0
+                    for j in atom_graph.get_neighbors(i):
+                        if j in self.active_atoms:
+                            if atom_graph.is_node(j):
+                                if atom_graph.get_coordination_number(j) <= self.active_CN:
+                                    Nnn += 1
+                    
+                    print [gcn, Nnn]
+        
+    
     def eval_current_density(self, atom_graph = None, normalize = True):
         
         '''
@@ -189,7 +213,7 @@ class cat_structure():
         curr = 0
         for i in self.active_atoms:
             if atom_graph.is_node(i):
-                if atom_graph.get_coordination_number(i) <= 9:
+                if atom_graph.get_coordination_number(i) <= self.active_CN:
                     gcn = atom_graph.get_generalized_coordination_number(i, 12)
                     BE_OH = self.metal.get_OH_BE(gcn)
                     BE_OOH = self.metal.get_OOH_BE(gcn)

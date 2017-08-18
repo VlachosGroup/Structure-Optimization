@@ -81,14 +81,16 @@ class NeuralNetwork():
         
         plt.figure()
         plt.plot(self.Y[:,0], self.Y_nn[:,0], 'o')  # Can do this for all outputs
-        plt.plot( [1.4, 2.6], [1.4, 2.6], '-', color = 'k')  # Can do this for all outputs
+        par_min = np.min( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
+        par_max = np.max( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
+        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
         
-        #plt.xticks(size=20)
-        #plt.yticks(size=20)
+        plt.xticks(size=18)
+        plt.yticks(size=18)
         plt.xlabel('High fidelity', size=24)
         plt.ylabel('Neural network', size=24)
-        plt.xlim([1.4,2.6])
-        plt.ylim([1.4,2.6])
+#        plt.xlim([1.4,2.6])
+#        plt.ylim([1.4,2.6])
         if not title is None:
             plt.title(title, size = 24)
         #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
@@ -102,14 +104,17 @@ class NeuralNetwork():
         
         plt.figure()
         plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')  # Can do this for all outputs
-        plt.plot([-70, 0], [-70, 0], '-', color = 'k')
         
-        #plt.xticks(size=20)
-        #plt.yticks(size=20)
+        par_min = np.min( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
+        par_max = np.max( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
+        plt.plot([par_min, par_max], [par_min, par_max], '-', color = 'k')
+        
+        plt.xticks(size=18)
+        plt.yticks(size=18)
         plt.xlabel('High fidelity', size=24)
         plt.ylabel('Neural network', size=24)
-        plt.xlim([-70,0])
-        plt.ylim([-70,0])
+#        plt.xlim([-70,0])
+#        plt.ylim([-70,0])
         if not title is None:
             plt.title(title, size = 24)
         #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
@@ -122,7 +127,7 @@ class NeuralNetwork():
         plt.close()
         
         
-    def train(self, regularization_parameter = 0.1):
+    def train(self, regularization_parameter = 10.0):
 
         '''
         Train the neural network with the available data
@@ -142,7 +147,7 @@ class NeuralNetwork():
         
         # Neural network set up
         #N_nodes = self.X.shape[1]
-        hidden_layer_sizes = (288,288) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
+        hidden_layer_sizes = (144,) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
 
         '''
         Scale Data
@@ -173,10 +178,57 @@ class NeuralNetwork():
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_set_size, random_state=1)
             
         ## Build Model
-        self.NNModel = MLPRegressor(activation = 'identity', solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
+        self.NNModel = MLPRegressor(activation = 'relu', solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
         
         ## Fit
 #        self.NNModel.fit(X_train, Y_train)
-        self.NNModel.fit(X, Y)
+        self.NNModel.fit(X_train, Y_train)
+        
+        # Analyze neural network fit
+        for weight_mat in self.NNModel.coefs_:
+            print weight_mat
         
         print 'Trained neural network with ' + str(X.shape[0]) + ' data points.'
+        self.Y_nn = self.predict( self.X )
+        Y_train_nn = self.predict( X_train )      # store predicted values
+        Y_test_nn = self.predict( X_test )      # store predicted values
+        
+        # Transform back to original variables
+        Y_train[:,0] = self.Ystds[0] * Y_train[:,0] + self.Ymeans[0] * np.ones(Y_train[:,0].shape)
+        Y_train[:,1] = self.Ystds[1] * Y_train[:,1] + self.Ymeans[1] * np.ones(Y_train[:,1].shape)
+        
+        Y_test[:,0] = self.Ystds[0] * Y_test[:,0] + self.Ymeans[0] * np.ones(Y_test[:,0].shape)
+        Y_test[:,1] = self.Ystds[1] * Y_test[:,1] + self.Ymeans[1] * np.ones(Y_test[:,1].shape)
+        
+        '''
+        Plot parity plots for analysis
+        '''
+        
+        mat.rcParams['mathtext.default'] = 'regular'
+        mat.rcParams['text.latex.unicode'] = 'False'
+        mat.rcParams['legend.numpoints'] = 1
+        mat.rcParams['lines.linewidth'] = 2
+        mat.rcParams['lines.markersize'] = 12
+        
+        
+        
+        plt.figure()
+        plt.plot(Y_train[:,1] , Y_train_nn[:,1], 'o', color = 'b')  # Can do this for all outputs
+        plt.plot(Y_test[:,1], Y_test_nn[:,1], 'o', color = 'r')
+        
+        par_min = np.min( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
+        par_max = np.max( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
+        plt.plot([par_min, par_max], [par_min, par_max], '-', color = 'k')
+        
+        plt.xticks(size=18)
+        plt.yticks(size=18)
+        plt.xlabel('High fidelity', size=24)
+        plt.ylabel('Neural network', size=24)
+#        plt.xlim([-70,0])
+#        plt.ylim([-70,0])
+        plt.legend(['training','test'], loc=4, prop={'size':20}, frameon=False)
+        plt.tight_layout()
+        plt.savefig('predict_test.png')
+        plt.close()
+        
+        raise NameError('stop')
