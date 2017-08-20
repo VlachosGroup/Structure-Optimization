@@ -155,6 +155,7 @@ class cat_structure():
     
     def eval_x(self, x):
     
+        x = np.array(x)
         self.evaluated = False
         # Build the defected graph
         self.defected_graph = self.template_graph.copy_data()
@@ -176,7 +177,7 @@ class cat_structure():
             self.surf_eng = self.eval_surface_energy()
             self.evaluated = True
         
-        return [self.surf_eng, -self.current_density]
+        return self.surf_eng, self.current_density
     
     
     def get_Nnn(self):
