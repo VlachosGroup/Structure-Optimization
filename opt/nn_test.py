@@ -15,7 +15,6 @@ import numpy as np
 from NeuralNetwork import NeuralNetwork
 from plotpop import *
 
-
 ''' User input '''
 d1 = 12
 d2 = 12
@@ -71,6 +70,10 @@ for i in xrange(len(population)):
 Main optimization loop
 '''
 
+x_data = []
+y_data = []
+
+bifidelity = False
 CPU_start = time.time()
 for gen in range(100):
 
@@ -84,15 +87,19 @@ for gen in range(100):
         for fit, ind in zip(fits, population):
             ind.fitness.values = fit
         CPU_end_eval = time.time()
-        print('Evaluation time: ' + str(CPU_end_eval - CPU_start_eval) + ' seconds')
+        #print('Evaluation time: ' + str(CPU_end_eval - CPU_start_eval) + ' seconds')
         
-        surrogate.refine( np.array(population), np.array(fits) )
-        surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))
-        plot_pop_SO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))
+        for ind in population:
+            x_data.append(ind)
+        y_data = y_data + fits
+
+        #surrogate.refine( np.array(population), np.array(fits) )
+        #surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))
+        #plot_pop_SO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))
     
     offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.1)
     
-    bifidelity = True
+    
     if bifidelity:
         for ind in offspring:
             ind.fitness.values = evalFitness_LF(ind)
@@ -110,12 +117,18 @@ fits = toolbox.map(toolbox.evaluate_HF, population)
 for fit, ind in zip(fits, population):
     ind.fitness.values = fit
 gen = 100
-surrogate.refine( np.array(population), np.array(fits) )
-surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))  
-plot_pop_SO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))    
+for ind in population:
+    x_data.append(ind)
+y_data = y_data + fits
+#surrogate.refine( np.array(population), np.array(fits) )
+#surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))  
+#plot_pop_SO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))    
 
 CPU_end = time.time()
 print('Genetic algorithm time: ' + str(CPU_end - CPU_start) + ' seconds')
+
+np.save('X.npy', np.array(x_data))
+np.save('Y.npy', np.array(y_data))
 
 most_active_ind = 0
 best_activity = fits[0]

@@ -3,8 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Cat structure optimization's documentation!
-======================================================
+.. include:: ../README.rst
+
+Documentation
+--------------
 
 .. toctree::
    :maxdepth: 2
@@ -12,14 +14,9 @@ Welcome to Cat structure optimization's documentation!
 
    
 .. automodule:: template
-
-.. autoclass:: dyno_struc
     :members:
-    
-   
+      
 .. automodule:: AB
-
-.. autoclass:: AB_model
     :members:
 
 Indices and tables
