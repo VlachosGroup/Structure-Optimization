@@ -315,6 +315,7 @@ class cat_structure():
         if fmat == 'picture':
             write('structure_' + str(n_struc) + '.png', defect_atoms_obj )
         elif fmat == 'xsd':
+            defect_atoms_obj.set_pbc(True)
             write('structure_' + str(n_struc) + '.xsd', defect_atoms_obj, format = fmat )
 
         

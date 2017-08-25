@@ -8,6 +8,7 @@ Note
 import os 
 import numpy as np
 import copy
+import time
 
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
@@ -29,7 +30,7 @@ class NeuralNetwork():
         
         self.Y_nn = None        # y values predicted by the neural network
         self.NNModel = None
-
+        
 
     def predict(self, x):
         
@@ -39,21 +40,26 @@ class NeuralNetwork():
 
         Ypred = self.NNModel.predict( x )
     
-        for i in range(len(self.Ymeans)):
-            Ypred[:,i] = self.Ystds[i] * Ypred[:,i] + self.Ymeans[i] * np.ones(Ypred[:,i].shape)
+        #for i in range(len(self.Ymeans)):
+        #    Ypred[:,i] = self.Ystds[i] * Ypred[:,i] + self.Ymeans[i] * np.ones(Ypred[:,i].shape)
             
         return Ypred
     
     
-    def refine(self, X_plus, Y_plus):
+    def refine(self, X_plus, Y_plus, reg_param = 0.01):
         
         '''
         Add new data to the training set and retrain
         X_plus and Y_plus need to be 2-D matrices of data
+        
+        :param X_plus: New x values
+        
+        :param Y_plus: New y values
+        
+        :param reg_param: Regularization parameter, lambda
         '''
         
-        self.NNModel = None
-        
+        original = True
         # Append to existing data sets
         if self.X is None or self.Y is None:
             self.X = X_plus
@@ -61,9 +67,27 @@ class NeuralNetwork():
         else:
             self.X = np.vstack( [ self.X , X_plus ] )
             self.Y = np.vstack( [ self.Y , Y_plus ] )
+            original = False
         
         # Regress the neural network
-        self.train()
+        CPU_start = time.time()
+
+        #self.standardize_outputs()
+        #Y = self.normalized_outputs(Y = Y_plus)
+        
+        # Perform regression
+        
+        original = True         # partial fit is not giving me good results...
+        if original:            # Fitting the model for the first time
+            self.NNModel = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.01,
+                alpha = reg_param, hidden_layer_sizes = (144,))
+            self.NNModel.fit(self.X, self.Y)
+        else:                   # Refining the model
+            self.NNModel.partial_fit(X_plus, Y_plus)
+        
+        CPU_end = time.time()
+        print('Neural network training time: ' + str(CPU_end - CPU_start) + ' seconds')
+        
         self.Y_nn = self.predict( self.X )      # store predicted values
 
 
@@ -80,17 +104,20 @@ class NeuralNetwork():
         mat.rcParams['lines.markersize'] = 12
         
         plt.figure()
-        plt.plot(self.Y[:,0], self.Y_nn[:,0], 'o')  # Can do this for all outputs
-        par_min = np.min( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
-        par_max = np.max( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
+        plt.plot(self.Y, self.Y_nn, 'o')  # Can do this for all outputs
+        par_min = min( [ np.min(self.Y), np.min(self.Y_nn)] )
+        par_max = max( [ np.max(self.Y), np.max(self.Y_nn)] )
+        #plt.plot(self.Y[:,0], self.Y_nn[:,0], 'o')  # Can do this for all outputs
+        #par_min = np.min( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
+        #par_max = np.max( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
         plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
         
         plt.xticks(size=18)
         plt.yticks(size=18)
         plt.xlabel('High fidelity', size=24)
         plt.ylabel('Neural network', size=24)
-#        plt.xlim([1.4,2.6])
-#        plt.ylim([1.4,2.6])
+        #plt.xlim([1.4,2.6])
+        #plt.ylim([1.4,2.6])
         if not title is None:
             plt.title(title, size = 24)
         #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
@@ -102,72 +129,75 @@ class NeuralNetwork():
         plt.savefig('Y1_' + fname)
         plt.close()
         
-        plt.figure()
-        plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')  # Can do this for all outputs
+        #plt.figure()
+        #plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')  # Can do this for all outputs
+        #
+        #par_min = np.min( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
+        #par_max = np.max( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
+        #plt.plot([par_min, par_max], [par_min, par_max], '-', color = 'k')
+        #
+        #plt.xticks(size=18)
+        #plt.yticks(size=18)
+        #plt.xlabel('High fidelity', size=24)
+        #plt.ylabel('Neural network', size=24)
+        ##plt.xlim([0,100])
+        ##plt.ylim([0,100])
+        #if not title is None:
+        #    plt.title(title, size = 24)
+        ##plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
+        #plt.tight_layout()
+        #
+        #if logscale:
+        #    plt.yscale('log')
+        #
+        #plt.savefig('Y2_' + fname)
+        #plt.close()
         
-        par_min = np.min( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
-        par_max = np.max( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
-        plt.plot([par_min, par_max], [par_min, par_max], '-', color = 'k')
+    
+    def standardize_outputs(self):
+        '''
+        Normalize the y values
+        '''
+
+        self.Ymeans = []
+        self.Ystds = []
+        for i in range(self.Y.shape[1]):
+            self.Ymeans.append( np.mean( self.Y[:,i] ) )
+            self.Ystds.append( np.std( self.Y[:,i] ) )
+    
+    
+    def normalized_outputs(self, Y = None):
+        '''
+        Return normalized outputs
         
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel('High fidelity', size=24)
-        plt.ylabel('Neural network', size=24)
-#        plt.xlim([-70,0])
-#        plt.ylim([-70,0])
-        if not title is None:
-            plt.title(title, size = 24)
-        #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        
-        if logscale:
-            plt.yscale('log')
-        
-        plt.savefig('Y2_' + fname)
-        plt.close()
-        
-        
-    def train(self, regularization_parameter = 10.0):
+        :returns: Normalized outputs
+        '''
+        if Y is None:
+            Y = copy.deepcopy(self.Y)
+        for i in range(Y.shape[1]):
+            Y[:,i] = Y[:,i] - self.Ymeans[i] * np.ones(Y[:,i].shape)
+            if self.Ystds[i] > 0:
+                Y[:,i] = Y[:,i] / self.Ystds[i]
+                
+        return Y
+    
+    
+    def train_CV(self, reg_param = 10.0, test_set_size = 0.2):
 
         '''
         Train the neural network with the available data
-        '''
-
-        if self.X is None or self.Y is None:
-            raise NameError('Data not defined.')
-
-        '''
-        User Input
-        '''
-        # data scaling: involves centering and standardizing data
-#        Data_scaling = True
         
-        # Train:test split cross validation set up
-        test_set_size = 0.2
+        :param reg_param: Regularization parameter, lambda
+        :param test_set_size: Fraction of the data set used for validation
+        '''
         
         # Neural network set up
         #N_nodes = self.X.shape[1]
         hidden_layer_sizes = (144,) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
-
-        '''
-        Scale Data
-        '''
         
-        X = copy.deepcopy(self.X)
-        Y = copy.deepcopy(self.Y)
-        
-        # Normalize the y values
-        self.Ymeans = []
-        self.Ystds = []
-        for i in range(Y.shape[1]):
-            self.Ymeans.append( np.mean( Y[:,i] ) )
-            self.Ystds.append( np.std( Y[:,i] ) )
-            
-            Y[:,i] = Y[:,i] - self.Ymeans[-1] * np.ones(Y[:,i].shape)
-            
-            # Divide by standard deviation if it is greater than zero
-            if self.Ystds[-1] > 0:
-                Y[:,i] = Y[:,i] / self.Ystds[-1]
+        X = self.X
+        self.standardize_outputs()
+        Y = self.normalized_outputs()
         
         
         '''
@@ -178,7 +208,7 @@ class NeuralNetwork():
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_set_size, random_state=1)
             
         ## Build Model
-        self.NNModel = MLPRegressor(activation = 'relu', solver = 'lbfgs', alpha = regularization_parameter, hidden_layer_sizes = hidden_layer_sizes)
+        self.NNModel = MLPRegressor(activation = 'relu', solver = 'lbfgs', alpha = reg_param, hidden_layer_sizes = hidden_layer_sizes)
         
         ## Fit
 #        self.NNModel.fit(X_train, Y_train)

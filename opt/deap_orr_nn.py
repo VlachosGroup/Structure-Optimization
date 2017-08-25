@@ -9,9 +9,13 @@ from Cat_structure import cat_structure
 
 import multiprocessing
 import random
+import time
 from deap import creator, base, tools, algorithms
 import numpy as np
-from plotpop import plot_pop
+from NeuralNetwork import NeuralNetwork
+from plotpop import *
+
+
 
 '''
 Create individual
@@ -20,20 +24,25 @@ creator.create('FitnessMulti', base.Fitness, weights = [-1.0, 3.0])
 creator.create('Individual', list, fitness=creator.FitnessMulti)
 
 '''
-Evaluation method
+Evaluation methods
 '''
 eval_obj = cat_structure(met_name = 'Pt', facet = '111', dim1 = 12, dim2 = 12)
-def evalFitness(individual):
+def evalFitness_HF(individual):
     return eval_obj.eval_x( individual )
 
+surrogate = NeuralNetwork()
+def evalFitness_LF(individual):
+    return surrogate.predict( np.array( [individual] ) )[0,:]
+    
 '''
 Populate toolbox with operators
-'''    
+'''
 toolbox = base.Toolbox()
 toolbox.register('bit', random.randint, 0, 1)
 toolbox.register('individual', tools.initRepeat, creator.Individual, toolbox.bit, n=144)
 toolbox.register('population', tools.initRepeat, list, toolbox.individual, n=600)
-toolbox.register('evaluate', evalFitness)
+toolbox.register('evaluate_HF', evalFitness_HF)
+toolbox.register('evaluate_LF', evalFitness_LF)
 toolbox.register('mate', tools.cxTwoPoint)
 toolbox.register('mutate', tools.mutFlipBit, indpb=2./144)
 toolbox.register('select', tools.selNSGA2)
@@ -55,35 +64,59 @@ for i in xrange(len(population)):
         else:
             population[i][j] = 0
 
-
-fits = toolbox.map(toolbox.evaluate, population)
-for fit, ind in zip(fits, population):
-    ind.fitness.values = fit
-
-
 '''
 Main optimization loop
 '''
 
-plot_pop_MO(np.array(fits), fname = 'Generation_0.png', title = 'Generation 0')
+CPU_start = time.time()
+for gen in range(100):
 
-for gen in range(10000):
-    #print 'Starting generation ' + str(gen+1)
+    print str(gen) + ' generations have elapsed.'
+    controlled = gen % 10 == 0
+    
+    if controlled:          # Evaluate the population with high fidelity and refine the neural network
+        
+        CPU_start_eval = time.time()
+        fits = toolbox.map(toolbox.evaluate_HF, population)
+        for fit, ind in zip(fits, population):
+            ind.fitness.values = fit
+        CPU_end_eval = time.time()
+        print('Evaluation time: ' + str(CPU_end_eval - CPU_start_eval) + ' seconds')
+        
+        surrogate.refine( np.array(population), np.array(fits) )
+        surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))
+        plot_pop_MO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))
+    
     offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.1)
-    fits = toolbox.map(toolbox.evaluate, offspring)
-    for fit, ind in zip(fits, offspring):
-        ind.fitness.values = fit
+    
+    for ind in offspring:
+        ind.fitness.values = evalFitness_LF(ind)
+    
     population = toolbox.select(offspring + population, k = 300)
 
-    if (gen+1) % 100 == 0:
-        plot_pop_MO(np.array(fits), fname = 'Generation_' + str(gen+1) + '.png', title = 'Generation ' + str(gen+1))
-        
+'''
+Evaluate final population
+'''
+fits = toolbox.map(toolbox.evaluate_HF, population)
+for fit, ind in zip(fits, population):
+    ind.fitness.values = fit
+gen = 100
+surrogate.refine( np.array(population), np.array(fits) )
+surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen)) 
+plot_pop_MO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))    
+
+CPU_end = time.time()
+print('Genetic algorithm time: ' + str(CPU_end - CPU_start) + ' seconds')
+
+'''
+Find best activity
+'''       
 most_active_ind = 0
-best_activity = fits[0][0]
+best_activity = fits[0][1]
 for ind in range(len(population)):
-    if fits[ind][0] > best_activity:
+    if fits[ind][1] > best_activity:
         most_active_ind = ind
-        best_activity = fits[ind][0]
+        best_activity = fits[ind][1]
         
 print best_activity
-eval_obj.show(x = population[most_active_ind], n_struc = 1, fmat = 'xsd')
+eval_obj.show(x = population[most_active_ind], n_struc = 1)
