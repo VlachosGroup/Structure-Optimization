@@ -153,33 +153,6 @@ class cat_structure():
             self.evaluated = False
                 
     
-    def eval_x(self, x):
-    
-        x = np.array(x)
-        self.evaluated = False
-        # Build the defected graph
-        self.defected_graph = self.template_graph.copy_data()
-        for i in range(len(x)):
-            if x[i] == 0:
-                self.defected_graph.remove_vertex(self.variable_atoms[i])
-        
-        return self.get_OFs()
-        
-    
-    def get_OFs(self):
-        
-        '''
-        Evaluate the objective functions
-        '''
-        
-        if not self.evaluated:          # Avoid repeated evaluations if the structure has not changed
-            self.current_density = self.eval_current_density()
-            self.surf_eng = self.eval_surface_energy()
-            self.evaluated = True
-        
-        return self.surf_eng, self.current_density
-    
-    
     def get_Nnn(self):
         '''
         For each active atom, print the number of nearest neighbors that are also active
@@ -240,6 +213,7 @@ class cat_structure():
         for i in self.active_atoms:
             if atom_graph.is_node(i):
                 E_form += self.metal.E_coh * ( 1 - np.sqrt( atom_graph.get_coordination_number(i) / 12.0 ) )
+                #E_form += self.metal.E_coh * ( 1 - atom_graph.get_coordination_number(i) / 12.0 )
                 
         if normalize:
             E_form = E_form * 1.60218e-19                                             # convert energy from eV to Joules

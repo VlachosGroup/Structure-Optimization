@@ -118,6 +118,8 @@ class NeuralNetwork():
         plt.ylabel('Neural network', size=24)
         #plt.xlim([1.4,2.6])
         #plt.ylim([1.4,2.6])
+        plt.xlim([0, 70])
+        plt.ylim([0, 70])
         if not title is None:
             plt.title(title, size = 24)
         #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)

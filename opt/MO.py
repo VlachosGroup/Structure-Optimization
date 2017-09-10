@@ -11,7 +11,7 @@ import multiprocessing
 import random
 from deap import creator, base, tools, algorithms
 import numpy as np
-from plotpop import plot_pop
+from plotpop import plot_pop_MO
 
 '''
 Create individual
@@ -67,7 +67,7 @@ Main optimization loop
 
 plot_pop_MO(np.array(fits), fname = 'Generation_0.png', title = 'Generation 0')
 
-for gen in range(10000):
+for gen in range(1000):
     #print 'Starting generation ' + str(gen+1)
     offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.1)
     fits = toolbox.map(toolbox.evaluate, offspring)
