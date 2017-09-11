@@ -1,0 +1,146 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>sim_anneal &#8212; Catalyst Structure Optimization 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for sim_anneal</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">General implementation of multi-objective simulated annealing</span>
+<span class="sd">See June 22 &quot;Implemented optimization&quot; commit</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<div class="viewcode-block" id="optimize"><a class="viewcode-back" href="../optimization.html#sim_anneal.optimize">[docs]</a><span class="k">def</span> <span class="nf">optimize</span><span class="p">(</span><span class="n">eval_obj</span><span class="p">,</span> <span class="n">total_steps</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">initial_T</span> <span class="o">=</span> <span class="mf">0.7</span><span class="p">,</span> <span class="n">n_record</span> <span class="o">=</span> <span class="mi">100</span><span class="p">):</span>
+    
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Use simulated annealing to optimize defects on the surface</span>
+<span class="sd">    </span>
+<span class="sd">    :param eval_obj: Object to be optimized. Must have get_OF(), rand_move(), and revert_last() methods.</span>
+<span class="sd">    </span>
+<span class="sd">    :param total_steps: Number of Metropolis steps to run</span>
+<span class="sd">    </span>
+<span class="sd">    :param initial_T: Initial temperature (dimensionless). A linear cooling schedule is used</span>
+<span class="sd">    </span>
+<span class="sd">    :param n_record: number of steps to print out (not counting initial state)</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    
+    <span class="c1"># Evaluate initial structure</span>
+    <span class="n">OF</span> <span class="o">=</span> <span class="n">eval_obj</span><span class="o">.</span><span class="n">get_OF</span><span class="p">()</span>     
+    <span class="nb">print</span>  <span class="nb">str</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39; steps elapsed:       &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">OF</span><span class="p">)</span>
+    
+    <span class="n">CPU_start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>        
+    
+    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span> <span class="n">total_steps</span> <span class="p">):</span>
+        
+        <span class="n">Metro_temp</span> <span class="o">=</span> <span class="n">initial_T</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="nb">float</span><span class="p">(</span><span class="n">step</span><span class="p">)</span> <span class="o">/</span> <span class="n">total_steps</span><span class="p">)</span>            <span class="c1"># Set temperature</span>
+        <span class="n">OF_prev</span> <span class="o">=</span> <span class="n">OF</span>                                                        <span class="c1"># Record data before changing structure</span>
+        <span class="n">eval_obj</span><span class="o">.</span><span class="n">rand_move</span><span class="p">()</span>                                                <span class="c1"># Do a Metropolis move</span>
+        <span class="n">OF</span> <span class="o">=</span> <span class="n">eval_obj</span><span class="o">.</span><span class="n">get_OF</span><span class="p">()</span>                  <span class="c1"># Evaluate the new structure and determine whether or not to accept</span>
+        
+        <span class="k">if</span> <span class="n">OF</span> <span class="o">-</span> <span class="n">OF_prev</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>                <span class="c1"># Downhill move</span>
+            <span class="n">accept</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>                               <span class="c1"># Uphill move</span>
+            <span class="k">if</span> <span class="n">Metro_temp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>              <span class="c1"># Finite temperature, may accept uphill moves</span>
+                <span class="n">accept</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span> <span class="o">-</span> <span class="p">(</span> <span class="n">OF</span> <span class="o">-</span> <span class="n">OF_prev</span> <span class="p">)</span> <span class="o">/</span> <span class="n">Metro_temp</span> <span class="p">)</span> <span class="o">&gt;</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>                           <span class="c1"># Zero temperature, never accept uphill moves</span>
+                <span class="n">accept</span> <span class="o">=</span> <span class="kc">False</span>
+        
+        <span class="c1"># Reverse the change if the move is not accepted</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">accept</span><span class="p">:</span>
+            <span class="n">eval_obj</span><span class="o">.</span><span class="n">revert_last</span><span class="p">()</span>
+            <span class="n">OF</span> <span class="o">=</span> <span class="n">OF_prev</span>            <span class="c1"># Use previous values for evaluations</span>
+        
+        <span class="c1"># Record data</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">step</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">total_steps</span> <span class="o">/</span> <span class="n">n_record</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span>  <span class="nb">str</span><span class="p">(</span><span class="n">step</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39; steps elapsed:       &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">OF</span><span class="p">)</span>
+        
+            
+    <span class="n">CPU_end</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Time elapsed: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">CPU_end</span> <span class="o">-</span> <span class="n">CPU_start</span><span class="p">)</span> <span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, Marcel Nunez.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.3.
+    </div>
+  </body>
+</html>

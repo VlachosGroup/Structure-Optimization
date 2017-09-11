@@ -1,0 +1,385 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Cat_structure &#8212; Catalyst Structure Optimization 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for Cat_structure</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Fri May 26 13:41:45 2017</span>
+
+<span class="sd">@author: mpnun</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mat</span>
+<span class="kn">import</span> <span class="nn">matplotlib.ticker</span> <span class="k">as</span> <span class="nn">mtick</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;C:\Users\mpnun\OneDrive\Documents</span><span class="se">\\</span><span class="s1">ase&#39;</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">ase.build</span> <span class="k">import</span> <span class="n">fcc111</span><span class="p">,</span> <span class="n">fcc100</span>
+<span class="kn">from</span> <span class="nn">ase.neighborlist</span> <span class="k">import</span> <span class="n">NeighborList</span>
+<span class="kn">from</span> <span class="nn">ase.io</span> <span class="k">import</span> <span class="n">read</span>
+<span class="kn">from</span> <span class="nn">ase.io</span> <span class="k">import</span> <span class="n">write</span>
+
+<span class="kn">from</span> <span class="nn">metal</span> <span class="k">import</span> <span class="n">metal</span>
+<span class="kn">from</span> <span class="nn">ORR</span> <span class="k">import</span> <span class="n">ORR_rate</span>
+<span class="kn">from</span> <span class="nn">graph_theory</span> <span class="k">import</span> <span class="n">Graph</span>
+
+<div class="viewcode-block" id="cat_structure"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure">[docs]</a><span class="k">class</span> <span class="nc">cat_structure</span><span class="p">():</span>
+    
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Catalyst structure with defects</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">met_name</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">facet</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dim1</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dim2</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">metal</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">surface_area</span> <span class="o">=</span> <span class="kc">None</span>                 <span class="c1"># surface area of the slab in square angstroms</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">evaluated</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_density</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">surf_eng</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active_CN</span> <span class="o">=</span> <span class="mi">9</span>                      <span class="c1"># CN must be less than or equal to this to be active</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">met_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        
+            <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            Build the slab</span>
+<span class="sd">            &#39;&#39;&#39;</span>        
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">metal</span> <span class="o">=</span> <span class="n">metal</span><span class="p">(</span><span class="n">met_name</span><span class="p">)</span>
+            
+            <span class="k">if</span> <span class="n">facet</span> <span class="o">==</span> <span class="s1">&#39;111&#39;</span> <span class="ow">or</span> <span class="n">facet</span> <span class="o">==</span> <span class="mi">111</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span> <span class="o">=</span> <span class="n">fcc111</span><span class="p">(</span><span class="n">met_name</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">dim1</span><span class="p">,</span> <span class="n">dim2</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">vacuum</span><span class="o">=</span><span class="mf">15.0</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">active_CN</span> <span class="o">=</span> <span class="mi">9</span>
+            <span class="k">elif</span> <span class="n">facet</span> <span class="o">==</span> <span class="s1">&#39;100&#39;</span> <span class="ow">or</span> <span class="n">facet</span> <span class="o">==</span> <span class="mi">100</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span> <span class="o">=</span> <span class="n">fcc100</span><span class="p">(</span><span class="n">met_name</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">dim1</span><span class="p">,</span> <span class="n">dim2</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">vacuum</span><span class="o">=</span><span class="mf">15.0</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">active_CN</span> <span class="o">=</span> <span class="mi">8</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39; is not a valid facet.&#39;</span><span class="p">)</span>
+                
+            <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="o">.</span><span class="n">set_pbc</span><span class="p">([</span><span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">])</span>
+            
+            <span class="c1"># Find neighbors based on distances</span>
+            <span class="n">rad_list</span> <span class="o">=</span> <span class="p">(</span> <span class="mf">2.77</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="p">)</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="p">))</span>               <span class="c1"># list of neighboradii for each site</span>
+            <span class="n">neighb_list</span> <span class="o">=</span> <span class="n">NeighborList</span><span class="p">(</span><span class="n">rad_list</span><span class="p">,</span> <span class="n">self_interaction</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>      <span class="c1"># set bothways = True to include both ways</span>
+            <span class="n">neighb_list</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="p">)</span>
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="p">)):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span><span class="o">.</span><span class="n">add_vertex</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">neighb_list</span><span class="o">.</span><span class="n">neighbors</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span><span class="o">.</span><span class="n">add_edge</span><span class="p">([</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">])</span>
+                
+            <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">dim1</span> <span class="o">*</span> <span class="n">dim2</span><span class="p">,</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">dim1</span> <span class="o">*</span> <span class="n">dim2</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">dim1</span> <span class="o">*</span> <span class="n">dim2</span><span class="p">,</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">dim1</span> <span class="o">*</span> <span class="n">dim2</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span><span class="p">)</span>        
+            
+            <span class="c1"># Compute surface area for use in normalization      </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">surface_area</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="o">.</span><span class="n">get_cell</span><span class="p">()[</span><span class="mi">0</span><span class="p">,:],</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="o">.</span><span class="n">get_cell</span><span class="p">()[</span><span class="mi">1</span><span class="p">,:]</span> <span class="p">)</span> <span class="p">)</span>        
+
+
+<div class="viewcode-block" id="cat_structure.copy_data"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.copy_data">[docs]</a>    <span class="k">def</span> <span class="nf">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Create a new individual with identical essential data</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="n">child</span> <span class="o">=</span> <span class="n">cat_structure</span><span class="p">()</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">metal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">active_atoms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">variable_atoms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">template_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">defected_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">copy_data</span><span class="p">()</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">surface_area</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_area</span>
+        <span class="n">child</span><span class="o">.</span><span class="n">atoms_obj_template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span>
+        <span class="k">return</span> <span class="n">child</span></div>
+    
+    
+<div class="viewcode-block" id="cat_structure.randomize"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.randomize">[docs]</a>    <span class="k">def</span> <span class="nf">randomize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coverage</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Randomize the occupancies in the top layer</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="n">x_rand</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">))</span> <span class="p">]</span>
+        
+        <span class="k">if</span> <span class="n">coverage</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">coverage</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+        <span class="n">n_occupancies</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span> <span class="nb">round</span><span class="p">(</span> <span class="n">coverage</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">)</span> <span class="p">)</span> <span class="p">)</span>
+        <span class="n">occupied_sites</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x_rand</span><span class="p">)),</span> <span class="n">n_occupancies</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">occupied_sites</span><span class="p">:</span>
+            <span class="n">x_rand</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">x_rand</span></div>
+        
+    
+<div class="viewcode-block" id="cat_structure.load_from_file"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.load_from_file">[docs]</a>    <span class="k">def</span> <span class="nf">load_from_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ftoread</span><span class="p">,</span> <span class="n">d_cut</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">):</span>
+    
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Determine which atoms in the template are missing in the defected structure</span>
+<span class="sd">        d_cut: distance cutoff in angstroms</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+
+        <span class="n">ASE_defected</span> <span class="o">=</span> <span class="n">read</span><span class="p">(</span><span class="n">ftoread</span><span class="p">,</span> <span class="nb">format</span> <span class="o">=</span> <span class="s1">&#39;xsd&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">atom_ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="p">)):</span>
+        
+            <span class="c1"># Get position and atomic number of the template atom we are trying to find</span>
+            <span class="n">cart_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="o">.</span><span class="n">get_positions</span><span class="p">()[</span><span class="n">atom_ind</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="n">atomic_num</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="o">.</span><span class="n">get_atomic_numbers</span><span class="p">()[</span><span class="n">atom_ind</span><span class="p">]</span>
+            
+            <span class="n">defect_ind</span> <span class="o">=</span> <span class="mi">0</span>      <span class="c1"># index of defect atom which might be a match</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="mf">1.0</span>      <span class="c1"># distance between atoms we are trying to match</span>
+            
+            <span class="n">match_found</span> <span class="o">=</span> <span class="kc">False</span>
+            
+            <span class="k">while</span> <span class="p">(</span><span class="ow">not</span> <span class="n">match_found</span><span class="p">)</span> <span class="ow">and</span> <span class="n">defect_ind</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">ASE_defected</span><span class="p">):</span>
+            
+                <span class="n">defect_coords</span> <span class="o">=</span> <span class="n">ASE_defected</span><span class="o">.</span><span class="n">get_positions</span><span class="p">()[</span><span class="n">defect_ind</span><span class="p">,</span> <span class="p">:]</span>
+                <span class="n">defect_an</span> <span class="o">=</span> <span class="n">ASE_defected</span><span class="o">.</span><span class="n">get_atomic_numbers</span><span class="p">()[</span><span class="n">defect_ind</span><span class="p">]</span>
+                <span class="n">dist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span> <span class="n">cart_coords</span> <span class="o">-</span> <span class="n">defect_coords</span> <span class="p">)</span>
+                <span class="n">match_found</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist</span> <span class="o">&lt;</span> <span class="n">d_cut</span><span class="p">)</span> <span class="c1">#and (defect_an == atomic_num)         # We do not need to check whether the elements match</span>
+                <span class="n">defect_ind</span> <span class="o">+=</span> <span class="mi">1</span>
+                
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match_found</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">remove_vertex</span><span class="p">(</span><span class="n">atom_ind</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">evaluated</span> <span class="o">=</span> <span class="kc">False</span></div>
+                
+    
+<div class="viewcode-block" id="cat_structure.get_Nnn"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.get_Nnn">[docs]</a>    <span class="k">def</span> <span class="nf">get_Nnn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        For each active atom, print the number of nearest neighbors that are also active</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">atom_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_coordination_number</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_CN</span><span class="p">:</span>
+                    
+                    <span class="n">gcn</span> <span class="o">=</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_generalized_coordination_number</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+                    
+                    <span class="n">Nnn</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_neighbors</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">j</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">j</span><span class="p">):</span>
+                                <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_coordination_number</span><span class="p">(</span><span class="n">j</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_CN</span><span class="p">:</span>
+                                    <span class="n">Nnn</span> <span class="o">+=</span> <span class="mi">1</span>
+                    
+                    <span class="nb">print</span> <span class="p">[</span><span class="n">gcn</span><span class="p">,</span> <span class="n">Nnn</span><span class="p">]</span></div>
+        
+    
+<div class="viewcode-block" id="cat_structure.eval_current_density"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.eval_current_density">[docs]</a>    <span class="k">def</span> <span class="nf">eval_current_density</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">atom_graph</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">normalize</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Normalized: current density [mA/cm^2]</span>
+<span class="sd">        Not normalized: current [mA]</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="n">atom_graph</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">atom_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span>
+
+        <span class="n">curr</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_coordination_number</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_CN</span><span class="p">:</span>
+                    <span class="n">gcn</span> <span class="o">=</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_generalized_coordination_number</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+                    <span class="n">BE_OH</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span><span class="o">.</span><span class="n">get_OH_BE</span><span class="p">(</span><span class="n">gcn</span><span class="p">)</span>
+                    <span class="n">BE_OOH</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span><span class="o">.</span><span class="n">get_OOH_BE</span><span class="p">(</span><span class="n">gcn</span><span class="p">)</span>
+                    <span class="n">curr</span> <span class="o">+=</span> <span class="n">ORR_rate</span><span class="p">(</span><span class="n">BE_OH</span><span class="p">,</span> <span class="n">BE_OOH</span><span class="p">)</span>
+                
+        <span class="k">if</span> <span class="n">normalize</span><span class="p">:</span>
+            <span class="n">curr</span> <span class="o">=</span> <span class="n">curr</span> <span class="o">/</span> <span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_area</span> <span class="o">*</span> <span class="mf">1.0e-16</span><span class="p">)</span>          <span class="c1"># normalize by surface area (in square centimeters)</span>
+  
+        <span class="k">return</span> <span class="n">curr</span></div>
+        
+    
+<div class="viewcode-block" id="cat_structure.eval_surface_energy"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.eval_surface_energy">[docs]</a>    <span class="k">def</span> <span class="nf">eval_surface_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">atom_graph</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">normalize</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Normalized: surface energy [J/m^2]</span>
+<span class="sd">        Not normalized: formation energy [eV]</span>
+<span class="sd">        &#39;&#39;&#39;</span>        
+        
+        <span class="k">if</span> <span class="n">atom_graph</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">atom_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span>
+        
+        <span class="n">E_form</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">active_atoms</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                <span class="n">E_form</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span><span class="o">.</span><span class="n">E_coh</span> <span class="o">*</span> <span class="p">(</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="n">atom_graph</span><span class="o">.</span><span class="n">get_coordination_number</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="mf">12.0</span> <span class="p">)</span> <span class="p">)</span>
+                <span class="c1">#E_form += self.metal.E_coh * ( 1 - atom_graph.get_coordination_number(i) / 12.0 )</span>
+                
+        <span class="k">if</span> <span class="n">normalize</span><span class="p">:</span>
+            <span class="n">E_form</span> <span class="o">=</span> <span class="n">E_form</span> <span class="o">*</span> <span class="mf">1.60218e-19</span>                                             <span class="c1"># convert energy from eV to Joules</span>
+            <span class="n">E_form</span> <span class="o">=</span> <span class="n">E_form</span> <span class="o">/</span> <span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_area</span> <span class="o">*</span> <span class="mf">1.0e-20</span><span class="p">)</span>                <span class="c1"># normalize by surface area (in square meters)</span>
+                
+        <span class="k">return</span> <span class="n">E_form</span></div>
+
+        
+<div class="viewcode-block" id="cat_structure.get_defected_mols"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.get_defected_mols">[docs]</a>    <span class="k">def</span> <span class="nf">get_defected_mols</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Use defected graph and template atoms object to generate</span>
+<span class="sd">        the atoms object for the defected structure</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="n">atoms_obj</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="p">)</span>
+        <span class="n">delete_these</span> <span class="o">=</span> <span class="p">[</span><span class="kc">False</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">atoms_obj</span><span class="p">))]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                <span class="n">delete_these</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        
+        <span class="n">delete_these</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">delete_these</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">atoms_obj</span><span class="p">[</span><span class="n">delete_these</span><span class="p">]</span>        
+        <span class="k">return</span> <span class="n">atoms_obj</span></div>
+        
+    
+<div class="viewcode-block" id="cat_structure.flip_atom"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.flip_atom">[docs]</a>    <span class="k">def</span> <span class="nf">flip_atom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ind</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        If atom number ind is present in the defected graph, remove it.</span>
+<span class="sd">        If it is not present, add it and all edges to adjacent atoms.</span>
+<span class="sd">        &#39;&#39;&#39;</span>        
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">ind</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">remove_vertex</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">add_vertex</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">neighb</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span><span class="o">.</span><span class="n">get_neighbors</span><span class="p">(</span><span class="n">ind</span><span class="p">):</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">is_node</span><span class="p">(</span><span class="n">neighb</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">add_edge</span><span class="p">([</span><span class="n">ind</span><span class="p">,</span> <span class="n">neighb</span><span class="p">])</span></div>
+    
+
+<div class="viewcode-block" id="cat_structure.show"><a class="viewcode-back" href="../ORR.html#Cat_structure.cat_structure.show">[docs]</a>    <span class="k">def</span> <span class="nf">show</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_struc</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">fmat</span> <span class="o">=</span> <span class="s1">&#39;picture&#39;</span><span class="p">):</span>
+                
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Print image of surface</span>
+<span class="sd">        &#39;&#39;&#39;</span>        
+        
+        <span class="c1"># Build defected graph</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span><span class="o">.</span><span class="n">copy_data</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">remove_vertex</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        
+        <span class="c1"># Build ASE atoms object from defected graph</span>
+        <span class="n">defect_atoms_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_defected_mols</span><span class="p">()</span>
+        
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">defect_atoms_obj</span><span class="o">.</span><span class="n">get_positions</span><span class="p">()</span>
+        <span class="n">a_nums</span> <span class="o">=</span> <span class="n">defect_atoms_obj</span><span class="o">.</span><span class="n">get_atomic_numbers</span><span class="p">()</span>
+        <span class="n">chem_symbs</span> <span class="o">=</span> <span class="n">defect_atoms_obj</span><span class="o">.</span><span class="n">get_chemical_symbols</span><span class="p">()</span>
+        
+        <span class="c1"># Change top layer atoms to Ni</span>
+        <span class="n">top_layer_z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">coords</span><span class="p">[:,</span><span class="mi">2</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">atom_ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">defect_atoms_obj</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">coords</span><span class="p">[</span><span class="n">atom_ind</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">top_layer_z</span> <span class="o">-</span> <span class="mf">0.1</span><span class="p">:</span>
+                <span class="n">a_nums</span><span class="p">[</span><span class="n">atom_ind</span><span class="p">]</span> <span class="o">=</span> <span class="mi">27</span>
+                <span class="n">chem_symbs</span><span class="p">[</span><span class="n">atom_ind</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;Co&#39;</span>
+                
+        <span class="n">defect_atoms_obj</span><span class="o">.</span><span class="n">set_atomic_numbers</span><span class="p">(</span><span class="n">a_nums</span><span class="p">)</span>
+        <span class="n">defect_atoms_obj</span><span class="o">.</span><span class="n">set_chemical_symbols</span><span class="p">(</span><span class="n">chem_symbs</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">fmat</span> <span class="o">==</span> <span class="s1">&#39;picture&#39;</span><span class="p">:</span>
+            <span class="n">write</span><span class="p">(</span><span class="s1">&#39;structure_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">n_struc</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.png&#39;</span><span class="p">,</span> <span class="n">defect_atoms_obj</span> <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">fmat</span> <span class="o">==</span> <span class="s1">&#39;xsd&#39;</span><span class="p">:</span>
+            <span class="n">defect_atoms_obj</span><span class="o">.</span><span class="n">set_pbc</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">write</span><span class="p">(</span><span class="s1">&#39;structure_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">n_struc</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.xsd&#39;</span><span class="p">,</span> <span class="n">defect_atoms_obj</span><span class="p">,</span> <span class="nb">format</span> <span class="o">=</span> <span class="n">fmat</span> <span class="p">)</span></div></div>
+
+        
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, Marcel Nunez.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.3.
+    </div>
+  </body>
+</html>

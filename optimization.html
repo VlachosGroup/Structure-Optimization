@@ -1,0 +1,234 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Optimization &#8212; Catalyst Structure Optimization 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Genetic Algorithm optimization" href="gen_alg.html" />
+    <link rel="prev" title="Oxygen reduction reaction" href="ORR.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="gen_alg.html" title="Genetic Algorithm optimization"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="ORR.html" title="Oxygen reduction reaction"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-NeuralNetwork">
+<span id="optimization"></span><h1>Optimization<a class="headerlink" href="#module-NeuralNetwork" title="Permalink to this headline">¶</a></h1>
+<p>Perform Neural Network fitting.
+Note
+- Make sure you have the latest scikit_learn. (For conda, simply update anaconda)
+- This is not for a large model. Find some C++ package for large problem.
+&#64;author: Geun Ho Gu</p>
+<span class="target" id="module-cat_optimize"></span><p>Adds optimization functionality to the ORR catalyst structure</p>
+<dl class="class">
+<dt id="cat_optimize.cat_optimize">
+<em class="property">class </em><code class="descclassname">cat_optimize.</code><code class="descname">cat_optimize</code><a class="reference internal" href="_modules/cat_optimize.html#cat_optimize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cat_optimize.cat_optimize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inherits ORR catalyst structure and adds optimization functionality</p>
+<dl class="method">
+<dt id="cat_optimize.cat_optimize.geo_crossover">
+<code class="descname">geo_crossover</code><span class="sig-paren">(</span><em>x1</em>, <em>x2</em>, <em>pt1=1</em>, <em>pt2=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cat_optimize.html#cat_optimize.geo_crossover"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cat_optimize.cat_optimize.geo_crossover" title="Permalink to this definition">¶</a></dt>
+<dd><p>Geometry-based crossover. Partions the catalyst surface into regions in a checkerboard style and performs crossover.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x1</strong> &#8211; Mom</li>
+<li><strong>x2</strong> &#8211; Dad</li>
+<li><strong>pt1</strong> &#8211; By default, use 1-point crossover in first dimension</li>
+<li><strong>pt2</strong> &#8211; By default, use 1-point crossover in second dimension</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Two offspring</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="cat_optimize.cat_optimize.get_OF">
+<code class="descname">get_OF</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cat_optimize.html#cat_optimize.get_OF"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cat_optimize.cat_optimize.get_OF" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>weights</strong> &#8211; Weights for the objective functions</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">A single objective function that is a linear superposition of the other objectives</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="cat_optimize.cat_optimize.get_OFs">
+<code class="descname">get_OFs</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cat_optimize.html#cat_optimize.get_OFs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cat_optimize.cat_optimize.get_OFs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective functions
+:returns: 2-ple of surface energy and current density</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-plotpop"></span><dl class="function">
+<dt id="plotpop.plot_pop_MO">
+<code class="descclassname">plotpop.</code><code class="descname">plot_pop_MO</code><span class="sig-paren">(</span><em>data</em>, <em>fname=None</em>, <em>title=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/plotpop.html#plot_pop_MO"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#plotpop.plot_pop_MO" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the population fitnesses for a multiple objective genetic algorithm</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> &#8211; 2-column matrix with objective values for each individual in each row</li>
+<li><strong>fname</strong> &#8211; File name to save the graph as. If none is given, it just displays.</li>
+<li><strong>title</strong> &#8211; Title for the graph.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="plotpop.plot_pop_SO">
+<code class="descclassname">plotpop.</code><code class="descname">plot_pop_SO</code><span class="sig-paren">(</span><em>data</em>, <em>fname=None</em>, <em>title=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/plotpop.html#plot_pop_SO"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#plotpop.plot_pop_SO" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the population fitnesses for a single objective genetic algorithm</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> &#8211; List or 1-D array of values</li>
+<li><strong>fname</strong> &#8211; File name to save the graph as. If none is given, it just displays.</li>
+<li><strong>title</strong> &#8211; Title for the graph.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<span class="target" id="module-sim_anneal"></span><p>General implementation of multi-objective simulated annealing
+See June 22 &#8220;Implemented optimization&#8221; commit</p>
+<dl class="function">
+<dt id="sim_anneal.optimize">
+<code class="descclassname">sim_anneal.</code><code class="descname">optimize</code><span class="sig-paren">(</span><em>eval_obj</em>, <em>total_steps=1000</em>, <em>initial_T=0.7</em>, <em>n_record=100</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sim_anneal.html#optimize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sim_anneal.optimize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use simulated annealing to optimize defects on the surface</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>eval_obj</strong> &#8211; Object to be optimized. Must have get_OF(), rand_move(), and revert_last() methods.</li>
+<li><strong>total_steps</strong> &#8211; Number of Metropolis steps to run</li>
+<li><strong>initial_T</strong> &#8211; Initial temperature (dimensionless). A linear cooling schedule is used</li>
+<li><strong>n_record</strong> &#8211; number of steps to print out (not counting initial state)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="ORR.html"
+                        title="previous chapter">Oxygen reduction reaction</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="gen_alg.html"
+                        title="next chapter">Genetic Algorithm optimization</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/optimization.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="gen_alg.html" title="Genetic Algorithm optimization"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="ORR.html" title="Oxygen reduction reaction"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, Marcel Nunez.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.3.
+    </div>
+  </body>
+</html>

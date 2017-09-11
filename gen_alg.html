@@ -1,0 +1,316 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Genetic Algorithm optimization &#8212; Catalyst Structure Optimization 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Optimization" href="optimization.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="optimization.html" title="Optimization"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="genetic-algorithm-optimization">
+<h1>Genetic Algorithm optimization<a class="headerlink" href="#genetic-algorithm-optimization" title="Permalink to this headline">¶</a></h1>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/vlachos/mpnunez/Github/Structure-Optimization/ORR/&#39;</span><span class="p">)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/vlachos/mpnunez/Github/Zacros-Wrapper&#39;</span><span class="p">)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/vlachos/mpnunez/python_packages/ase&#39;</span><span class="p">)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/vlachos/mpnunez/python_packages/sklearn/lib/python2.7/site-packages&#39;</span><span class="p">)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/vlachos/mpnunez/python_packages/DEAP/lib/python2.7/site-packages&#39;</span><span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">deap</span> <span class="kn">import</span> <span class="n">creator</span><span class="p">,</span> <span class="n">base</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">algorithms</span>
+
+<span class="c1">#from Cat_structure import cat_structure</span>
+<span class="kn">from</span> <span class="nn">cat_optimize</span> <span class="kn">import</span> <span class="n">cat_optimize</span>
+<span class="kn">from</span> <span class="nn">NeuralNetwork</span> <span class="kn">import</span> <span class="n">NeuralNetwork</span>
+<span class="kn">from</span> <span class="nn">plotpop</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="sd">&#39;&#39;&#39; User input &#39;&#39;&#39;</span>
+<span class="n">d1</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">d2</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">pop_size</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="n">offspring_size</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">n_gens</span> <span class="o">=</span> <span class="mi">300</span>
+<span class="n">n_snaps</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">crossover_prob</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">mutation_prob</span> <span class="o">=</span> <span class="mf">0.2</span>
+<span class="n">mutation_rate</span> <span class="o">=</span> <span class="mf">1.5</span><span class="o">/</span><span class="p">(</span><span class="n">d1</span><span class="o">*</span><span class="n">d2</span><span class="p">)</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Create individual</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="n">creator</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s1">&#39;FitnessMulti&#39;</span><span class="p">,</span> <span class="n">base</span><span class="o">.</span><span class="n">Fitness</span><span class="p">,</span> <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,])</span>
+<span class="n">creator</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s1">&#39;Individual&#39;</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="n">fitness</span><span class="o">=</span><span class="n">creator</span><span class="o">.</span><span class="n">FitnessMulti</span><span class="p">)</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Evaluation methods</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="n">eval_obj</span> <span class="o">=</span> <span class="n">cat_optimize</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">evalFitness_HF</span><span class="p">(</span><span class="n">individual</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">eval_obj</span><span class="o">.</span><span class="n">eval_x</span><span class="p">(</span> <span class="n">individual</span> <span class="p">)[</span><span class="mi">1</span><span class="p">],</span>
+
+<span class="n">surrogate</span> <span class="o">=</span> <span class="n">NeuralNetwork</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">evalFitness_LF</span><span class="p">(</span><span class="n">individual</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">surrogate</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span> <span class="p">[</span><span class="n">individual</span><span class="p">]</span> <span class="p">)</span> <span class="p">)[</span><span class="mi">0</span><span class="p">],</span>
+
+<span class="k">def</span> <span class="nf">cross</span><span class="p">(</span><span class="n">ind1</span><span class="p">,</span><span class="n">ind2</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">eval_obj</span><span class="o">.</span><span class="n">geo_crossover</span><span class="p">(</span> <span class="n">ind1</span><span class="p">,</span><span class="n">ind2</span> <span class="p">)</span>
+    
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Populate toolbox with operators</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="n">toolbox</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">Toolbox</span><span class="p">()</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;bit&#39;</span><span class="p">,</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;individual&#39;</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">initRepeat</span><span class="p">,</span> <span class="n">creator</span><span class="o">.</span><span class="n">Individual</span><span class="p">,</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">bit</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">d1</span><span class="o">*</span><span class="n">d2</span><span class="p">)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;population&#39;</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">initRepeat</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">individual</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">pop_size</span><span class="p">)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;evaluate_HF&#39;</span><span class="p">,</span> <span class="n">evalFitness_HF</span><span class="p">)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;evaluate_LF&#39;</span><span class="p">,</span> <span class="n">evalFitness_LF</span><span class="p">)</span>
+<span class="c1">#toolbox.register(&#39;mate&#39;, tools.cxTwoPoint)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;mate&#39;</span><span class="p">,</span> <span class="n">cross</span><span class="p">)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;mutate&#39;</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">mutFlipBit</span><span class="p">,</span> <span class="n">indpb</span><span class="o">=</span><span class="n">mutation_rate</span> <span class="p">)</span>
+<span class="c1">#toolbox.register(&#39;select&#39;, tools.selBest)</span>
+<span class="c1">#toolbox.register(&#39;select&#39;, tools.selRoulette)</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;select&#39;</span><span class="p">,</span> <span class="n">tools</span><span class="o">.</span><span class="n">selTournament</span><span class="p">,</span> <span class="n">tournsize</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Register statistics</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="n">stats</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">Statistics</span><span class="p">(</span><span class="k">lambda</span> <span class="n">ind</span><span class="p">:</span> <span class="n">ind</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+<span class="n">stats</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;min&quot;</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">min</span><span class="p">)</span>
+<span class="n">stats</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;avg&quot;</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>
+<span class="n">stats</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;max&quot;</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">max</span><span class="p">)</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Enable parallelization</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">()</span>
+<span class="n">toolbox</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;map&quot;</span><span class="p">,</span> <span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">)</span>
+<span class="k">print</span> <span class="s1">&#39;Using &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">())</span> <span class="o">+</span> <span class="s1">&#39; processors.&#39;</span>
+
+<span class="c1"># Initialize population and evaluate</span>
+<span class="n">population</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">population</span><span class="p">()</span>
+
+<span class="c1"># Randomize according to coverages</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">)):</span>
+    <span class="n">coverage</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">[</span><span class="n">i</span><span class="p">])):</span>
+        <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">coverage</span><span class="p">:</span>
+            <span class="n">population</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">population</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Main optimization loop</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="n">x_data</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">y_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="n">bifidelity</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="n">CPU_start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+
+<span class="k">for</span> <span class="n">gen</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_gens</span><span class="p">):</span>
+    
+    <span class="n">controlled</span> <span class="o">=</span> <span class="p">(</span><span class="n">gen</span> <span class="o">%</span> <span class="n">n_snaps</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="n">bifidelity</span>
+    
+    <span class="c1"># Evaluate population fitnesses if it is the first iteration or if it is a bifidelity controlled generation</span>
+    <span class="k">if</span> <span class="n">controlled</span> <span class="ow">or</span> <span class="n">gen</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        
+        <span class="c1">#CPU_start_eval = time.time()</span>
+        <span class="n">fits</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">toolbox</span><span class="o">.</span><span class="n">evaluate_HF</span><span class="p">,</span> <span class="n">population</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fit</span><span class="p">,</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fits</span><span class="p">,</span> <span class="n">population</span><span class="p">):</span>
+            <span class="n">ind</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span> <span class="o">=</span> <span class="n">fit</span>
+        <span class="c1">#CPU_end_eval = time.time()</span>
+        <span class="c1">#print(&#39;Evaluation time: &#39; + str(CPU_end_eval - CPU_start_eval) + &#39; seconds&#39;)</span>
+    
+    <span class="c1"># Refine neural network model</span>
+    <span class="k">if</span> <span class="n">gen</span> <span class="o">%</span> <span class="n">n_snaps</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">population</span><span class="p">:</span>
+            <span class="n">x_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+        <span class="n">y_data</span> <span class="o">=</span> <span class="n">y_data</span> <span class="o">+</span> <span class="n">fits</span>
+        
+    <span class="k">if</span> <span class="n">controlled</span><span class="p">:</span>
+        <span class="n">surrogate</span><span class="o">.</span><span class="n">refine</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">population</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fits</span><span class="p">)</span> <span class="p">)</span>
+        <span class="n">surrogate</span><span class="o">.</span><span class="n">plot_parity</span><span class="p">(</span><span class="s1">&#39;parity_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.png&#39;</span><span class="p">,</span> <span class="n">title</span> <span class="o">=</span> <span class="s1">&#39;Generation &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">))</span>
+    
+    <span class="k">if</span> <span class="n">gen</span> <span class="o">%</span> <span class="p">(</span><span class="n">n_gens</span> <span class="o">/</span> <span class="n">n_snaps</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">print</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39; generations have elapsed - taking snapshot&#39;</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">population</span><span class="p">)</span>
+        <span class="k">print</span> <span class="n">record</span>
+        <span class="n">plot_pop_SO</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fits</span><span class="p">),</span> <span class="n">fname</span> <span class="o">=</span> <span class="s1">&#39;Generation_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.png&#39;</span><span class="p">,</span> <span class="n">title</span> <span class="o">=</span> <span class="s1">&#39;Generation &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">))</span>
+    
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Create offspring form the population</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1">#offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.1)</span>
+    <span class="c1">#offspring = algorithms.varOr(population, toolbox, lambda_=offspring_size, cxpb=crossover_prob, mutpb=mutation_prob)</span>
+    
+    <span class="n">offspring</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">offspring</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">offspring_size</span><span class="p">:</span>
+        <span class="n">op_choice</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">op_choice</span> <span class="o">&lt;</span> <span class="n">crossover_prob</span><span class="p">:</span>            <span class="c1"># Apply crossover</span>
+            <span class="n">ind1</span><span class="p">,</span> <span class="n">ind2</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">toolbox</span><span class="o">.</span><span class="n">clone</span><span class="p">,</span> <span class="n">random</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">population</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+            <span class="n">ind1</span><span class="p">,</span> <span class="n">ind2</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">mate</span><span class="p">(</span><span class="n">ind1</span><span class="p">,</span> <span class="n">ind2</span><span class="p">)</span>
+            <span class="k">del</span> <span class="n">ind1</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span>
+            <span class="n">offspring</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ind1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">offspring</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">offspring_size</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">ind2</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span>
+                <span class="n">offspring</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ind2</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>                           <span class="c1"># Apply reproduction</span>
+            <span class="n">offspring</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">population</span><span class="p">))</span>
+    
+    <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">offspring</span><span class="p">:</span>
+        <span class="n">op_choice</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">op_choice</span> <span class="o">&lt;</span> <span class="n">mutation_prob</span><span class="p">:</span>  <span class="c1"># Apply mutation</span>
+            <span class="n">ind</span><span class="p">,</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+            <span class="k">del</span> <span class="n">ind</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span>
+    
+    <span class="c1"># Evaluate offspring with low fidelity model</span>
+    <span class="k">if</span> <span class="n">bifidelity</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">offspring</span><span class="p">:</span>
+            <span class="n">ind</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span> <span class="o">=</span> <span class="n">evalFitness_LF</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+    
+    <span class="c1"># Evaluate offspring with high fidelity model</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">fits</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">toolbox</span><span class="o">.</span><span class="n">evaluate_HF</span><span class="p">,</span> <span class="n">offspring</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fit</span><span class="p">,</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fits</span><span class="p">,</span> <span class="n">offspring</span><span class="p">):</span>
+            <span class="n">ind</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span> <span class="o">=</span> <span class="n">fit</span>
+    
+    <span class="c1">#population = toolbox.select(offspring + population, k = pop_size)           # (mu + lambda)-selection</span>
+    <span class="n">population</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">offspring</span><span class="p">,</span> <span class="n">k</span> <span class="o">=</span> <span class="n">pop_size</span><span class="p">)</span>                 <span class="c1"># (mu,lambda)-selection</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Evaluate final population</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="n">fits</span> <span class="o">=</span> <span class="n">toolbox</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">toolbox</span><span class="o">.</span><span class="n">evaluate_HF</span><span class="p">,</span> <span class="n">population</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">fit</span><span class="p">,</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fits</span><span class="p">,</span> <span class="n">population</span><span class="p">):</span>
+    <span class="n">ind</span><span class="o">.</span><span class="n">fitness</span><span class="o">.</span><span class="n">values</span> <span class="o">=</span> <span class="n">fit</span>
+<span class="n">gen</span> <span class="o">=</span> <span class="n">gen</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">population</span><span class="p">:</span>
+    <span class="n">x_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+<span class="n">y_data</span> <span class="o">=</span> <span class="n">y_data</span> <span class="o">+</span> <span class="n">fits</span>
+<span class="c1">#surrogate.refine( np.array(population), np.array(fits) )</span>
+<span class="c1">#surrogate.plot_parity(&#39;parity_&#39; + str(gen) + &#39;.png&#39;, title = &#39;Generation &#39; + str(gen))</span>
+<span class="k">print</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39; generations have elapsed - taking snapshot&#39;</span>
+<span class="n">record</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">population</span><span class="p">)</span>
+<span class="k">print</span> <span class="n">record</span>
+<span class="n">plot_pop_SO</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fits</span><span class="p">),</span> <span class="n">fname</span> <span class="o">=</span> <span class="s1">&#39;Generation_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.png&#39;</span><span class="p">,</span> <span class="n">title</span> <span class="o">=</span> <span class="s1">&#39;Generation &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gen</span><span class="p">))</span>    
+
+<span class="n">CPU_end</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+<span class="k">print</span><span class="p">(</span><span class="s1">&#39;Genetic algorithm time: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">CPU_end</span> <span class="o">-</span> <span class="n">CPU_start</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39; seconds&#39;</span><span class="p">)</span>
+
+<span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;X.npy&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x_data</span><span class="p">))</span>
+<span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;Y.npy&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y_data</span><span class="p">))</span>
+
+<span class="n">most_active_ind</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">best_activity</span> <span class="o">=</span> <span class="n">fits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">population</span><span class="p">)):</span>
+    <span class="k">if</span> <span class="n">fits</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">best_activity</span><span class="p">:</span>
+        <span class="n">most_active_ind</span> <span class="o">=</span> <span class="n">ind</span>
+        <span class="n">best_activity</span> <span class="o">=</span> <span class="n">fits</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span>
+     
+<span class="c1"># Print best activity</span>
+<span class="n">eval_obj</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">population</span><span class="p">[</span><span class="n">most_active_ind</span><span class="p">],</span> <span class="n">n_struc</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="optimization.html"
+                        title="previous chapter">Optimization</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/gen_alg.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="optimization.html" title="Optimization"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, Marcel Nunez.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.3.
+    </div>
+  </body>
+</html>

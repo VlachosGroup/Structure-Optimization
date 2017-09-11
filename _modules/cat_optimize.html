@@ -1,0 +1,197 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>cat_optimize &#8212; Catalyst Structure Optimization 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for cat_optimize</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Adds optimization functionality to the ORR catalyst structure</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/vlachos/mpnunez/Github/Structure-Optimization/ORR/&#39;</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">Cat_structure</span> <span class="k">import</span> <span class="n">cat_structure</span>
+
+
+<div class="viewcode-block" id="cat_optimize"><a class="viewcode-back" href="../optimization.html#cat_optimize.cat_optimize">[docs]</a><span class="k">class</span> <span class="nc">cat_optimize</span><span class="p">(</span><span class="n">cat_structure</span><span class="p">):</span>
+    
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Inherits ORR catalyst structure and adds optimization functionality</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    
+    <span class="n">Pt_Pt_1nn_dist</span> <span class="o">=</span> <span class="mf">2.77</span>       <span class="c1"># angstrom</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Call superclass constructor</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="c1">#super(cat_optimize, self).__init__(met_name = &#39;Pt&#39;, facet = 111, dim1 = 12, dim2 = 12)</span>
+        <span class="n">cat_structure</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">met_name</span> <span class="o">=</span> <span class="s1">&#39;Pt&#39;</span><span class="p">,</span> <span class="n">facet</span> <span class="o">=</span> <span class="mi">111</span><span class="p">,</span> <span class="n">dim1</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">dim2</span> <span class="o">=</span> <span class="mi">12</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">atom_last_moved</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">]</span>
+        
+        
+<div class="viewcode-block" id="cat_optimize.geo_crossover"><a class="viewcode-back" href="../optimization.html#cat_optimize.cat_optimize.geo_crossover">[docs]</a>    <span class="k">def</span> <span class="nf">geo_crossover</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">pt1</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">pt2</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Geometry-based crossover. Partions the catalyst surface into regions in a checkerboard style and performs crossover.</span>
+<span class="sd">        </span>
+<span class="sd">        :param x1: Mom</span>
+<span class="sd">        :param x2: Dad</span>
+<span class="sd">        :param pt1: By default, use 1-point crossover in first dimension</span>
+<span class="sd">        :param pt2: By default, use 1-point crossover in second dimension</span>
+<span class="sd">        </span>
+<span class="sd">        :returns: Two offspring</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="n">x_bounds</span> <span class="o">=</span> <span class="p">[</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xrange</span><span class="p">(</span><span class="n">pt1</span><span class="p">)]</span>
+        <span class="n">y_bounds</span> <span class="o">=</span> <span class="p">[</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xrange</span><span class="p">(</span><span class="n">pt2</span><span class="p">)]</span>
+        
+        <span class="n">frac_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms_obj_template</span><span class="o">.</span><span class="n">get_scaled_positions</span><span class="p">()</span>
+        
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x1</span><span class="p">)):</span>
+            
+            <span class="c1"># Find whether it is an even or odd cell</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">bound</span> <span class="ow">in</span> <span class="n">x_bounds</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">frac_coords</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">bound</span><span class="p">:</span>
+                    <span class="n">score</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">bound</span> <span class="ow">in</span> <span class="n">y_bounds</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">frac_coords</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">bound</span><span class="p">:</span>
+                    <span class="n">score</span> <span class="o">+=</span> <span class="mi">1</span>
+            
+            <span class="c1"># Swap if it is in an even cell</span>
+            <span class="k">if</span> <span class="n">score</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">x1</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">x2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">x2</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">x1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        
+        <span class="k">return</span> <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span></div>
+    
+    
+    <span class="k">def</span> <span class="nf">eval_x</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">evaluated</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># Build the defected graph</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">template_graph</span><span class="o">.</span><span class="n">copy_data</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">defected_graph</span><span class="o">.</span><span class="n">remove_vertex</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_OFs</span><span class="p">()</span>
+        
+    
+<div class="viewcode-block" id="cat_optimize.get_OF"><a class="viewcode-back" href="../optimization.html#cat_optimize.cat_optimize.get_OF">[docs]</a>    <span class="k">def</span> <span class="nf">get_OF</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        :param weights: Weights for the objective functions</span>
+<span class="sd">        :returns: A single objective function that is a linear superposition of the other objectives</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">eval_surface_energy</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">eval_current_density</span><span class="p">()</span></div>
+        
+    
+<div class="viewcode-block" id="cat_optimize.get_OFs"><a class="viewcode-back" href="../optimization.html#cat_optimize.cat_optimize.get_OFs">[docs]</a>    <span class="k">def</span> <span class="nf">get_OFs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Evaluate the objective functions</span>
+<span class="sd">        :returns: 2-ple of surface energy and current density</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">eval_surface_energy</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">eval_current_density</span><span class="p">()</span> <span class="c1">#+ np.random.normal(loc=0.0, scale=0.025)</span></div>
+     
+        
+    <span class="k">def</span> <span class="nf">rand_move</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">atom_last_moved</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_atoms</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flip_atom</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atom_last_moved</span><span class="p">)</span>
+    
+    <span class="k">def</span> <span class="nf">revert_last</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flip_atom</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atom_last_moved</span><span class="p">)</span></div>
+    
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Catalyst Structure Optimization 1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, Marcel Nunez.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.3.
+    </div>
+  </body>
+</html>
