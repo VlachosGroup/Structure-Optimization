@@ -20,6 +20,7 @@ import os
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
 sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization/ORR')
+sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization/opt')
 
 # -- General configuration ------------------------------------------------
 
@@ -48,7 +49,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Cat structure optimization'
+project = u'Catalyst Structure Optimization'
 copyright = u'2017, Marcel Nunez'
 author = u'Marcel Nunez'
 

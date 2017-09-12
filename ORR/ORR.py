@@ -10,10 +10,12 @@ import numpy as np
 def ORR_rate(delEads_OH, delEads_OOH):
     
     '''
-    Compute ORR rate from *OH and *OOH binding energies
+    Compute ORR rate from OH and OOH binding energies
     Follows the method and data in S.1 of F. Calle-Vallejo et al., Science 350(6257), 185 (2015).
     Also see J. K. Nørskov et al., The Journal of Physical Chemistry B 108(46), 17886 (2004).
     for method on how to convert binding energies to activity
+    
+    :returns: Current
     '''        
     
     kB = 8.617e-5                      # eV / K

@@ -47,6 +47,14 @@ toolbox.register('mate', tools.cxTwoPoint)
 toolbox.register('mutate', tools.mutFlipBit, indpb=2./144)
 toolbox.register('select', tools.selNSGA2)
 
+'''
+Register statistics
+'''
+stats = tools.Statistics(lambda ind: ind.fitness.values)
+stats.register("min", numpy.min)
+stats.register("avg", numpy.mean)
+stats.register("max", numpy.max)
+
 # Enable parallelization
 pool = multiprocessing.Pool()
 toolbox.register("map", pool.map)
@@ -68,13 +76,16 @@ for i in xrange(len(population)):
 Main optimization loop
 '''
 
+bifidelity = False
+
 CPU_start = time.time()
-for gen in range(100):
+n_gens = 100
+for gen in range(n_gens):
 
     print str(gen) + ' generations have elapsed.'
-    controlled = gen % 10 == 0
+    controlled = (gen % 10 == 0) and bifidelity
     
-    if controlled:          # Evaluate the population with high fidelity and refine the neural network
+    if controlled or gen == 0:          # Evaluate the population with high fidelity and refine the neural network
         
         CPU_start_eval = time.time()
         fits = toolbox.map(toolbox.evaluate_HF, population)
@@ -82,15 +93,31 @@ for gen in range(100):
             ind.fitness.values = fit
         CPU_end_eval = time.time()
         print('Evaluation time: ' + str(CPU_end_eval - CPU_start_eval) + ' seconds')
-        
+    
+    if controlled:
+    
         surrogate.refine( np.array(population), np.array(fits) )
         surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))
+        
+    
+    if gen % (n_gens / 10) == 0:
+        print str(gen) + ' generations have elapsed - taking snapshot'
+        record = stats.compile(population)
+        print record
         plot_pop_MO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = 'Generation ' + str(gen))
     
     offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.1)
     
-    for ind in offspring:
-        ind.fitness.values = evalFitness_LF(ind)
+    # Evaluate offspring with low fidelity model
+    if bifidelity:
+        for ind in offspring:
+            ind.fitness.values = evalFitness_LF(ind)
+    
+    # Evaluate offspring with high fidelity model
+    else:
+        fits = toolbox.map(toolbox.evaluate_HF, offspring)
+        for fit, ind in zip(fits, offspring):
+            ind.fitness.values = fit
     
     population = toolbox.select(offspring + population, k = 300)
 

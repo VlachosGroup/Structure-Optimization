@@ -13,7 +13,8 @@ import numpy as np
 
 from deap import creator, base, tools, algorithms
 
-from Cat_structure import cat_structure
+#from Cat_structure import cat_structure
+from cat_optimize import cat_optimize
 from NeuralNetwork import NeuralNetwork
 from plotpop import *
 
@@ -28,6 +29,10 @@ crossover_prob = 0.3
 mutation_prob = 0.2
 mutation_rate = 1.5/(d1*d2)
 
+#pop_size = 20
+#offspring_size = 100
+#n_gens = 30
+
 '''
 Create individual
 '''
@@ -37,7 +42,7 @@ creator.create('Individual', list, fitness=creator.FitnessMulti)
 '''
 Evaluation methods
 '''
-eval_obj = cat_structure(met_name = 'Pt', facet = '111', dim1 = d1, dim2 = d2)
+eval_obj = cat_optimize()
 def evalFitness_HF(individual):
     return eval_obj.eval_x( individual )[1],
 
@@ -61,7 +66,10 @@ toolbox.register('evaluate_LF', evalFitness_LF)
 toolbox.register('mate', cross)
 toolbox.register('mutate', tools.mutFlipBit, indpb=mutation_rate )
 #toolbox.register('select', tools.selBest)
+#toolbox.register('select', tools.selRoulette)
 toolbox.register('select', tools.selTournament, tournsize=2)
+
+hof = tools.HallOfFame(1)               # Record the best individual as the optimization progresses
 
 '''
 Register statistics
@@ -101,8 +109,6 @@ bifidelity = False
 CPU_start = time.time()
 
 
-
-
 for gen in range(n_gens):
     
     controlled = (gen % n_snaps == 0) and bifidelity
@@ -118,11 +124,16 @@ for gen in range(n_gens):
         #print('Evaluation time: ' + str(CPU_end_eval - CPU_start_eval) + ' seconds')
     
     # Refine neural network model
-    if controlled:
+    if gen % n_snaps == 0:
+        fits = toolbox.map(toolbox.evaluate_HF, population)
+        for fit, ind in zip(fits, population):
+            ind.fitness.values = fit
+            
         for ind in population:
             x_data.append(ind)
         y_data = y_data + fits
-
+        
+    if controlled:
         surrogate.refine( np.array(population), np.array(fits) )
         surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))
     
@@ -171,19 +182,20 @@ for gen in range(n_gens):
     
     #population = toolbox.select(offspring + population, k = pop_size)           # (mu + lambda)-selection
     population = toolbox.select(offspring, k = pop_size)                 # (mu,lambda)-selection
+    hof.update(population)
 
 '''
 Evaluate final population
 '''
-#fits = toolbox.map(toolbox.evaluate_HF, population)
-#for fit, ind in zip(fits, population):
-#    ind.fitness.values = fit
+fits = toolbox.map(toolbox.evaluate_HF, population)
+for fit, ind in zip(fits, population):
+    ind.fitness.values = fit
 gen = gen + 1
-#for ind in population:
-#    x_data.append(ind)
-#y_data = y_data + fits
+for ind in population:
+    x_data.append(ind)
+y_data = y_data + fits
 #surrogate.refine( np.array(population), np.array(fits) )
-#surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))  
+#surrogate.plot_parity('parity_' + str(gen) + '.png', title = 'Generation ' + str(gen))
 print str(gen) + ' generations have elapsed - taking snapshot'
 record = stats.compile(population)
 print record
@@ -192,15 +204,10 @@ plot_pop_SO(np.array(fits), fname = 'Generation_' + str(gen) + '.png', title = '
 CPU_end = time.time()
 print('Genetic algorithm time: ' + str(CPU_end - CPU_start) + ' seconds')
 
-np.save('X.npy', np.array(x_data))
-np.save('Y.npy', np.array(y_data))
+#np.save('X.npy', np.array(x_data))
+#np.save('Y.npy', np.array(y_data))
 
-most_active_ind = 0
-best_activity = fits[0]
-for ind in range(len(population)):
-    if fits[ind] > best_activity:
-        most_active_ind = ind
-        best_activity = fits[ind]
+print hof
      
 # Print best activity
-eval_obj.show(x = population[most_active_ind], n_struc = 1)
+#eval_obj.show(x = population[most_active_ind], n_struc = 1)

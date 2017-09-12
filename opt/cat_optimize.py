@@ -3,6 +3,7 @@ Adds optimization functionality to the ORR catalyst structure
 '''
 
 import random
+import numpy as np
 
 import sys
 sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization/ORR/')
@@ -35,8 +36,8 @@ class cat_optimize(cat_structure):
         
         :param x1: Mom
         :param x2: Dad
-        :param pt1: By default, use 2-point crossover in first dimension
-        :param pt2: By default, use 2-point crossover in second dimension
+        :param pt1: By default, use 1-point crossover in first dimension
+        :param pt2: By default, use 1-point crossover in second dimension
         
         :returns: Two offspring
         '''
@@ -94,7 +95,7 @@ class cat_optimize(cat_structure):
         :returns: 2-ple of surface energy and current density
         '''
         
-        return self.eval_surface_energy(), self.eval_current_density()
+        return self.eval_surface_energy(), self.eval_current_density() #+ np.random.normal(loc=0.0, scale=0.025)
      
         
     def rand_move(self):

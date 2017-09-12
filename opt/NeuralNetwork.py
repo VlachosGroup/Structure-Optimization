@@ -10,24 +10,53 @@ import numpy as np
 import copy
 import time
 
-from sklearn.neural_network import MLPRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error
+import multiprocessing
 
 import matplotlib.pyplot as plt
 import matplotlib as mat
 import matplotlib.ticker as mtick
 
+from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import KFold
+from sklearn.utils import shuffle
+
+
+# Evaluation function for a given split
+def eval_split(train_test_pair):
+    '''
+    :param train_test_pair: 3-item list of 
+        1. training indices
+        2. test indices
+        3. NeuralNetwork object
+        
+    :returns: Mean square error of the fit with some holdout
+    '''
+    train_test_pair[2].NNModel.fit(train_test_pair[2].X[train_test_pair[0]], train_test_pair[2].Y[train_test_pair[0]])
+    Y_test_pred = train_test_pair[2].NNModel.predict( train_test_pair[2].X[train_test_pair[1]] )
+    return np.mean( (Y_test_pred - train_test_pair[2].Y[train_test_pair[1]]) ** 2 )
+
+    
 class NeuralNetwork():
+    
+    '''
+    Handles training of multi-layer perceptron from sklearn
+    '''
     
     def __init__(self):
         
+        '''
+        Initialize with empty data
+        '''
+        
         self.X = None           # numpy array of x values
         self.Y = None           # numpy array of y values
-        self.Ymeans = None
-        self.Ystds = None
-        
+        self.X_scaler = None        
+        self.Y_scaler = None        # Use the StandardScaler class
+            
         self.Y_nn = None        # y values predicted by the neural network
         self.NNModel = None
         
@@ -38,15 +67,11 @@ class NeuralNetwork():
         Compute value for the model as trained so far
         '''
 
-        Ypred = self.NNModel.predict( x )
-    
-        #for i in range(len(self.Ymeans)):
-        #    Ypred[:,i] = self.Ystds[i] * Ypred[:,i] + self.Ymeans[i] * np.ones(Ypred[:,i].shape)
-            
+        Ypred = self.NNModel.predict( x )   
         return Ypred
     
     
-    def refine(self, X_plus, Y_plus, reg_param = 0.01):
+    def refine(self, X_plus, Y_plus, reg_param = 1.0):
         
         '''
         Add new data to the training set and retrain
@@ -91,7 +116,7 @@ class NeuralNetwork():
         self.Y_nn = self.predict( self.X )      # store predicted values
 
 
-    def plot_parity(self, fname = 'parity.png', title = None, logscale = False):
+    def plot_parity(self, fname = 'parity.png', title = None, logscale = False, limits = None):
     
         '''
         Plot a parity plot for the data trained so far
@@ -102,6 +127,16 @@ class NeuralNetwork():
         mat.rcParams['legend.numpoints'] = 1
         mat.rcParams['lines.linewidth'] = 2
         mat.rcParams['lines.markersize'] = 12
+        
+        '''
+        Should loop through all outputs (if there are multiple)
+        '''
+        
+        # Figure out how many outputs there are
+        if len(self.Y.shape) == 1:
+            Y_d = 1
+        else:
+            Y_d = self.Y.shape[1]
         
         plt.figure()
         plt.plot(self.Y, self.Y_nn, 'o')  # Can do this for all outputs
@@ -116,10 +151,9 @@ class NeuralNetwork():
         plt.yticks(size=18)
         plt.xlabel('High fidelity', size=24)
         plt.ylabel('Neural network', size=24)
-        #plt.xlim([1.4,2.6])
-        #plt.ylim([1.4,2.6])
-        plt.xlim([0, 70])
-        plt.ylim([0, 70])
+        if not limits is None:
+            plt.xlim(limits)
+            plt.ylim(limits)
         if not title is None:
             plt.title(title, size = 24)
         #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
@@ -131,136 +165,48 @@ class NeuralNetwork():
         plt.savefig('Y1_' + fname)
         plt.close()
         
-        #plt.figure()
-        #plt.plot(self.Y[:,1], self.Y_nn[:,1], 'o')  # Can do this for all outputs
-        #
-        #par_min = np.min( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
-        #par_max = np.max( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
-        #plt.plot([par_min, par_max], [par_min, par_max], '-', color = 'k')
-        #
-        #plt.xticks(size=18)
-        #plt.yticks(size=18)
-        #plt.xlabel('High fidelity', size=24)
-        #plt.ylabel('Neural network', size=24)
-        ##plt.xlim([0,100])
-        ##plt.ylim([0,100])
-        #if not title is None:
-        #    plt.title(title, size = 24)
-        ##plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
-        #plt.tight_layout()
-        #
-        #if logscale:
-        #    plt.yscale('log')
-        #
-        #plt.savefig('Y2_' + fname)
-        #plt.close()
-        
     
-    def standardize_outputs(self):
-        '''
-        Normalize the y values
-        '''
-
-        self.Ymeans = []
-        self.Ystds = []
-        for i in range(self.Y.shape[1]):
-            self.Ymeans.append( np.mean( self.Y[:,i] ) )
-            self.Ystds.append( np.std( self.Y[:,i] ) )
-    
-    
-    def normalized_outputs(self, Y = None):
-        '''
-        Return normalized outputs
-        
-        :returns: Normalized outputs
-        '''
-        if Y is None:
-            Y = copy.deepcopy(self.Y)
-        for i in range(Y.shape[1]):
-            Y[:,i] = Y[:,i] - self.Ymeans[i] * np.ones(Y[:,i].shape)
-            if self.Ystds[i] > 0:
-                Y[:,i] = Y[:,i] / self.Ystds[i]
-                
-        return Y
-    
-    
-    def train_CV(self, reg_param = 10.0, test_set_size = 0.2):
+    def k_fold_CV(self, k = 10, reg_param = 1.0, parallel = True):
 
         '''
-        Train the neural network with the available data
+        k-fold cross validation
+        
+        :param k: Number of segments to split the data set. By dafault, use 10-fold cross validation
         
         :param reg_param: Regularization parameter, lambda
+        
         :param test_set_size: Fraction of the data set used for validation
+        
+        :returns: cross-validation score
         '''
         
+        pool = multiprocessing.Pool()       # For parallelization
+        
+        self.X, self.Y = shuffle(self.X, self.Y)
+
         # Neural network set up
         #N_nodes = self.X.shape[1]
         hidden_layer_sizes = (144,) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
-        
-        X = self.X
-        self.standardize_outputs()
-        Y = self.normalized_outputs()
-        
-        
-        '''
-        Perform regression
-        '''
-        
-        ## Split Data
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_set_size, random_state=1)
-            
         ## Build Model
-        self.NNModel = MLPRegressor(activation = 'relu', solver = 'lbfgs', alpha = reg_param, hidden_layer_sizes = hidden_layer_sizes)
+        self.NNModel = MLPRegressor(activation = 'relu', verbose=False, learning_rate_init=0.01,
+                alpha = reg_param, hidden_layer_sizes = (144,))
         
-        ## Fit
-#        self.NNModel.fit(X_train, Y_train)
-        self.NNModel.fit(X_train, Y_train)
+        # Populate training and testing set lists
+        kf = KFold(n_splits=k)
         
-        # Analyze neural network fit
-        for weight_mat in self.NNModel.coefs_:
-            print weight_mat
+        if parallel:
         
-        print 'Trained neural network with ' + str(X.shape[0]) + ' data points.'
-        self.Y_nn = self.predict( self.X )
-        Y_train_nn = self.predict( X_train )      # store predicted values
-        Y_test_nn = self.predict( X_test )      # store predicted values
+            train_test_list = []
+            for train, test in kf.split(self.X, y = self.Y):
+                train_test_list.append([train, test, self])
+            MSEs = pool.map(eval_split, train_test_list)
+            
+        else:
         
-        # Transform back to original variables
-        Y_train[:,0] = self.Ystds[0] * Y_train[:,0] + self.Ymeans[0] * np.ones(Y_train[:,0].shape)
-        Y_train[:,1] = self.Ystds[1] * Y_train[:,1] + self.Ymeans[1] * np.ones(Y_train[:,1].shape)
-        
-        Y_test[:,0] = self.Ystds[0] * Y_test[:,0] + self.Ymeans[0] * np.ones(Y_test[:,0].shape)
-        Y_test[:,1] = self.Ystds[1] * Y_test[:,1] + self.Ymeans[1] * np.ones(Y_test[:,1].shape)
-        
-        '''
-        Plot parity plots for analysis
-        '''
-        
-        mat.rcParams['mathtext.default'] = 'regular'
-        mat.rcParams['text.latex.unicode'] = 'False'
-        mat.rcParams['legend.numpoints'] = 1
-        mat.rcParams['lines.linewidth'] = 2
-        mat.rcParams['lines.markersize'] = 12
-        
-        
-        
-        plt.figure()
-        plt.plot(Y_train[:,1] , Y_train_nn[:,1], 'o', color = 'b')  # Can do this for all outputs
-        plt.plot(Y_test[:,1], Y_test_nn[:,1], 'o', color = 'r')
-        
-        par_min = np.min( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
-        par_max = np.max( np.vstack([self.Y[:,1], self.Y_nn[:,1]]) )
-        plt.plot([par_min, par_max], [par_min, par_max], '-', color = 'k')
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel('High fidelity', size=24)
-        plt.ylabel('Neural network', size=24)
-#        plt.xlim([-70,0])
-#        plt.ylim([-70,0])
-        plt.legend(['training','test'], loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig('predict_test.png')
-        plt.close()
-        
-        raise NameError('stop')
+            MSEs = []
+            for train, test in kf.split(self.X, y = self.Y):
+                self.NNModel.fit(self.X[train], self.Y[train])
+                Y_test_pred = self.NNModel.predict( self.X[test] )
+                MSEs.append( np.mean( (Y_test_pred - self.Y[test]) ** 2 ) )
+            
+        return np.sqrt( np.mean(np.array(MSEs)) )

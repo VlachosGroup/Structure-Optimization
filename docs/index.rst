@@ -11,13 +11,11 @@ Documentation
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-
    
-.. automodule:: template
-    :members:
-      
-.. automodule:: AB
-    :members:
+   ORR
+   optimization
+   gen_alg
+
 
 Indices and tables
 ==================

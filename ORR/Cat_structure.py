@@ -291,5 +291,7 @@ class cat_structure():
         elif fmat == 'xsd':
             defect_atoms_obj.set_pbc(True)
             write('structure_' + str(n_struc) + '.xsd', defect_atoms_obj, format = fmat )
+        elif fmat == 'povray':
+            write('structure_' + str(n_struc) + '.pov', defect_atoms_obj )
 
         

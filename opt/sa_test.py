@@ -22,3 +22,6 @@ x.weights = [0, -1.]
 # Optimize
 optimize(x, total_steps = 500 * 144, initial_T = 0.7 * active_norm, n_record = 100)
 print str(x.eval_current_density()) + ' mA/cm^2'
+
+x.show(fmat = 'picture')
+x.show(fmat = '.xsd')

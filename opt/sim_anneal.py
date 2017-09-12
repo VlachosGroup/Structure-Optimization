@@ -11,9 +11,13 @@ def optimize(eval_obj, total_steps = 1000, initial_T = 0.7, n_record = 100):
     
     '''
     Use simulated annealing to optimize defects on the surface
+    
     :param eval_obj: Object to be optimized. Must have get_OF(), rand_move(), and revert_last() methods.
+    
     :param total_steps: Number of Metropolis steps to run
+    
     :param initial_T: Initial temperature (dimensionless). A linear cooling schedule is used
+    
     :param n_record: number of steps to print out (not counting initial state)
     '''
     

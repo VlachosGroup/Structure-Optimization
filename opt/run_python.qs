@@ -15,7 +15,7 @@ vpkg_require "python-numpy"
 vpkg_require "python-scipy"
 
 # The  executable:
-export PYTHON_EXE="python nn_test.py"
+export PYTHON_EXE="python test_train.py"
 
 # Simple summary:
 echo ""
