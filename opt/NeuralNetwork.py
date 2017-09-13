@@ -104,7 +104,7 @@ class NeuralNetwork():
         
         original = True         # partial fit is not giving me good results...
         if original:            # Fitting the model for the first time
-            self.NNModel = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.01,
+            self.NNModel = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.001,
                 alpha = reg_param, hidden_layer_sizes = (144,))
             self.NNModel.fit(self.X, self.Y)
         else:                   # Refining the model
@@ -138,32 +138,41 @@ class NeuralNetwork():
         else:
             Y_d = self.Y.shape[1]
         
-        plt.figure()
-        plt.plot(self.Y, self.Y_nn, 'o')  # Can do this for all outputs
-        par_min = min( [ np.min(self.Y), np.min(self.Y_nn)] )
-        par_max = max( [ np.max(self.Y), np.max(self.Y_nn)] )
-        #plt.plot(self.Y[:,0], self.Y_nn[:,0], 'o')  # Can do this for all outputs
-        #par_min = np.min( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
-        #par_max = np.max( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
-        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
+        for i in range(Y_d):
         
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel('High fidelity', size=24)
-        plt.ylabel('Neural network', size=24)
-        if not limits is None:
-            plt.xlim(limits)
-            plt.ylim(limits)
-        if not title is None:
-            plt.title(title, size = 24)
-        #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        
-        if logscale:
-            plt.yscale('log')
-        
-        plt.savefig('Y1_' + fname)
-        plt.close()
+            if Y_d == 1:
+                data_1 = self.Y
+                data_2 = self.Y_nn
+            else:
+                data_1 = self.Y[:,i]
+                data_2 = self.Y_nn[:,i]
+                
+            plt.figure()
+            plt.plot(data_1, data_2, 'o')  # Can do this for all outputs
+            par_min = min( [ np.min(data_1), np.min(data_2)] )
+            par_max = max( [ np.max(data_1), np.max(data_2)] )
+            #plt.plot(self.Y[:,0], self.Y_nn[:,0], 'o')  # Can do this for all outputs
+            #par_min = np.min( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
+            #par_max = np.max( np.vstack([self.Y[:,0], self.Y_nn[:,0]]) )
+            plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
+            
+            plt.xticks(size=18)
+            plt.yticks(size=18)
+            plt.xlabel('High fidelity', size=24)
+            plt.ylabel('Neural network', size=24)
+            if not limits is None:
+                plt.xlim(limits)
+                plt.ylim(limits)
+            if not title is None:
+                plt.title('Y_' + str(i) + '_' + title, size = 24)
+            #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
+            plt.tight_layout()
+            
+            if logscale:
+                plt.yscale('log')
+                
+            plt.savefig('Y_' + str(i) + '_' + fname)
+            plt.close()
         
     
     def k_fold_CV(self, k = 10, reg_param = 1.0, parallel = True):

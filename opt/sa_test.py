@@ -20,8 +20,8 @@ active_norm = ORR_rate(Pt_met.get_OH_BE(8.27), Pt_met.get_OOH_BE(8.27)) / ( x.su
 x.weights = [0, -1.]
 
 # Optimize
-optimize(x, total_steps = 500 * 144, initial_T = 0.7 * active_norm, n_record = 100)
+optimize(x, total_steps = 500*144, initial_T = 0.7 * active_norm, n_record = 100)
 print str(x.eval_current_density()) + ' mA/cm^2'
 
-x.show(fmat = 'picture')
-x.show(fmat = '.xsd')
+x.show(fname = 'SA_opt', fmat = 'png')
+x.show(fname = 'SA_opt', fmat = 'xsd')

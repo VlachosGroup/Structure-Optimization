@@ -32,10 +32,14 @@ class cat_structure():
     
     def __init__(self, met_name = None, facet = None, dim1 = None, dim2 = None):
         
+        self.dim1 = dim1
+        self.dim2 = dim2
+        
         self.metal = None
         self.atoms_obj_template = None
         self.active_atoms = None
         self.variable_atoms = None
+        self.variable_occs = None
         self.template_graph = None
         self.defected_graph = None
         self.surface_area = None                 # surface area of the slab in square angstroms
@@ -106,6 +110,9 @@ class cat_structure():
         
         '''
         Randomize the occupancies in the top layer
+        
+        :param coverage: coverage of the random structure. If None, coverage
+            will be chosen from the uniform distribution between 0 and 1
         '''
         
         x_rand = [0 for i in range(len(self.variable_atoms)) ]
@@ -151,7 +158,9 @@ class cat_structure():
                 self.defected_graph.remove_vertex(atom_ind)
 
             self.evaluated = False
-                
+        
+        self.compute_variable_occs()
+        
     
     def get_Nnn(self):
         '''
@@ -174,29 +183,41 @@ class cat_structure():
                     print [gcn, Nnn]
         
     
-    def eval_current_density(self, atom_graph = None, normalize = True):
+    def get_site_currents(self):
+        '''
+        Evaluate the contribution to the current from each site
         
-        '''
-        Normalized: current density [mA/cm^2]
-        Not normalized: current [mA]
+        :returns: List of site currents for each active site
         '''
 
-        if atom_graph is None:
-            atom_graph = self.defected_graph
-
-        curr = 0
-        for i in self.active_atoms:
-            if atom_graph.is_node(i):
-                if atom_graph.get_coordination_number(i) <= self.active_CN:
-                    gcn = atom_graph.get_generalized_coordination_number(i, 12)
+        curr_list = [0. for i in range(len(self.active_atoms))]
+        for i in range(len(self.active_atoms)):
+            site_ind = self.active_atoms[i]
+            if self.defected_graph.is_node(site_ind):
+                if self.defected_graph.get_coordination_number(site_ind) <= self.active_CN:
+                    gcn = self.defected_graph.get_generalized_coordination_number(site_ind, 12)
                     BE_OH = self.metal.get_OH_BE(gcn)
                     BE_OOH = self.metal.get_OOH_BE(gcn)
-                    curr += ORR_rate(BE_OH, BE_OOH)
-                
+                    curr_list[i] = ORR_rate(BE_OH, BE_OOH)
+                    
+        return curr_list
+                    
+                    
+    def eval_current_density(self, normalize = True):
+        
+        '''
+        :param normalize: current density [mA/cm^2]
+        
+        Not normalized: current [mA]
+        '''       
+        
+        site_currents = self.get_site_currents()
+        J = sum(site_currents)
+        
         if normalize:
-            curr = curr / ( self.surface_area * 1.0e-16)          # normalize by surface area (in square centimeters)
+            J = J / ( self.surface_area * 1.0e-16)          # normalize by surface area (in square centimeters)
   
-        return curr
+        return J
         
     
     def eval_surface_energy(self, atom_graph = None, normalize = True):
@@ -256,7 +277,7 @@ class cat_structure():
                     self.defected_graph.add_edge([ind, neighb])
     
 
-    def show(self, x = None, n_struc = 1, fmat = 'picture'):
+    def show(self, x = None, fname = 'structure_1', fmat = 'png'):
                 
         '''
         Print image of surface
@@ -286,12 +307,63 @@ class cat_structure():
         defect_atoms_obj.set_atomic_numbers(a_nums)
         defect_atoms_obj.set_chemical_symbols(chem_symbs)
         
-        if fmat == 'picture':
-            write('structure_' + str(n_struc) + '.png', defect_atoms_obj )
+        if fmat == 'png':
+            write(fname + '.png', defect_atoms_obj )
         elif fmat == 'xsd':
             defect_atoms_obj.set_pbc(True)
-            write('structure_' + str(n_struc) + '.xsd', defect_atoms_obj, format = fmat )
+            write(fname + '.xsd', defect_atoms_obj, format = fmat )
         elif fmat == 'povray':
-            write('structure_' + str(n_struc) + '.pov', defect_atoms_obj )
+            write(fname + '.pov', defect_atoms_obj )
+
+    
+    def compute_variable_occs(self):
+        self.variable_occs = [0 for i in range(len(self.variable_atoms))]
+        ind = 0
+        for i in self.variable_atoms:
+            if self.defected_graph.is_node(i):
+                self.variable_occs[ind] = 1
+            ind += 1
+    
+    
+    def generate_all_translations(self):
+        '''
+        Generate a symmetery matrix which has all possible translations of the
+        sites within the unit cell
+        '''
+        
+        all_translations = []
+        n_var = len(self.variable_atoms)
+        for var_ind in range(n_var):
+            d1, d2 = self.var_ind_to_sym_inds(var_ind)    
+            all_translations.append( self.variable_shift( d1, d2) )
+                
+        return np.array(all_translations)
 
         
+    def variable_shift(self, shift1, shift2):
+        '''
+        Permute occupancies according to symmetry
+        
+        :param shift1: Number of indices to translate along first axis
+        
+        :param shift2: Number of indices to translate along second axis
+        '''
+        
+        n_var = len(self.variable_atoms)
+        new_occs = np.zeros(n_var)
+        
+        for var_ind in range(n_var):
+            d1, d2 = self.var_ind_to_sym_inds(var_ind)
+            map_from_ind = self.sym_inds_to_var_ind( d1 - shift1 , d2 - shift2 )
+            new_occs[var_ind] = self.variable_occs[ map_from_ind ]
+            
+        return new_occs
+        
+    
+    def sym_inds_to_var_ind(self, sym_ind1, sym_ind2):
+        sym_ind1 = sym_ind1 % self.dim1
+        sym_ind2 = sym_ind2 % self.dim2
+        return sym_ind2 * self.dim1 + sym_ind1
+    
+    def var_ind_to_sym_inds(self,var_ind):
+        return var_ind % self.dim1, var_ind / self.dim1
