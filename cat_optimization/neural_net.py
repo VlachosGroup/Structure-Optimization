@@ -1,10 +1,3 @@
-"""
-Perform Neural Network fitting.
-Note
-- Make sure you have the latest scikit_learn. (For conda, simply update anaconda)
-- This is not for a large model. Find some C++ package for large problem.
-@author: Geun Ho Gu
-"""
 import os 
 import numpy as np
 import copy
@@ -40,17 +33,24 @@ def eval_split(train_test_pair):
     return np.mean( (Y_test_pred - train_test_pair[2].Y[train_test_pair[1]]) ** 2 )
 
     
-class NeuralNetwork():
+class NeuralNetwork(MLPRegressor):
     
     '''
-    Handles training of multi-layer perceptron from sklearn
+    Adds a little functionality onto the multi-layer perceptron of sklearn
+    1. Stores the data used to train
+    2. Parallelized CV score
+    3. Plotting of parity plots for each objective
     '''
     
-    def __init__(self):
+    def __init__(self, activation = 'relu', verbose=True, learning_rate_init=0.0001,
+                alpha = 1.0, hidden_layer_sizes = (81,), max_iter=10000, tol=0.00001):
         
         '''
-        Initialize with empty data
+        Initialize the neural network with default parameters and empty data
         '''
+        
+        MLPRegressor.__init__(self, activation = activation, verbose=verbose, learning_rate_init=learning_rate_init,
+                alpha = alpha, hidden_layer_sizes = hidden_layer_sizes, max_iter=max_iter, tol=tol)
         
         self.X = None           # numpy array of x values
         self.Y = None           # numpy array of y values
@@ -58,20 +58,9 @@ class NeuralNetwork():
         self.Y_scaler = None        # Use the StandardScaler class
             
         self.Y_nn = None        # y values predicted by the neural network
-        self.NNModel = None
-        
-
-    def predict(self, x):
-        
-        '''
-        Compute value for the model as trained so far
-        '''
-
-        Ypred = self.NNModel.predict( x )   
-        return Ypred
     
     
-    def refine(self, X_plus, Y_plus, reg_param = 1.0):
+    def refine(self, X_plus, Y_plus):
         
         '''
         Add new data to the training set and retrain
@@ -96,19 +85,14 @@ class NeuralNetwork():
         
         # Regress the neural network
         CPU_start = time.time()
-
-        #self.standardize_outputs()
-        #Y = self.normalized_outputs(Y = Y_plus)
         
         # Perform regression
         
         original = True         # partial fit is not giving me good results...
         if original:            # Fitting the model for the first time
-            self.NNModel = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.001,
-                alpha = reg_param, hidden_layer_sizes = (144,))
-            self.NNModel.fit(self.X, self.Y)
+            self.fit(self.X, self.Y)
         else:                   # Refining the model
-            self.NNModel.partial_fit(X_plus, Y_plus)
+            self.partial_fit(X_plus, Y_plus)
         
         CPU_end = time.time()
         print('Neural network training time: ' + str(CPU_end - CPU_start) + ' seconds')
@@ -164,14 +148,14 @@ class NeuralNetwork():
                 plt.xlim(limits)
                 plt.ylim(limits)
             if not title is None:
-                plt.title('Y_' + str(i) + '_' + title, size = 24)
+                plt.title('Y_' + str(i+1) + '_' + title, size = 24)
             #plt.legend(series_labels, loc=4, prop={'size':20}, frameon=False)
             plt.tight_layout()
             
             if logscale:
                 plt.yscale('log')
                 
-            plt.savefig('Y_' + str(i) + '_' + fname)
+            plt.savefig('Y_' + str(i+1) + '_' + fname)
             plt.close()
         
     
@@ -195,9 +179,9 @@ class NeuralNetwork():
 
         # Neural network set up
         #N_nodes = self.X.shape[1]
-        hidden_layer_sizes = (144,) # (#perceptrons in layer 1, #perceptrons in layer 2, #perceptrons in layer 3, ...)
+        
         ## Build Model
-        self.NNModel = MLPRegressor(activation = 'relu', verbose=False, learning_rate_init=0.01,
+        self = MLPRegressor(activation = 'relu', verbose=False, learning_rate_init=0.01,
                 alpha = reg_param, hidden_layer_sizes = (144,))
         
         # Populate training and testing set lists
@@ -214,8 +198,8 @@ class NeuralNetwork():
         
             MSEs = []
             for train, test in kf.split(self.X, y = self.Y):
-                self.NNModel.fit(self.X[train], self.Y[train])
-                Y_test_pred = self.NNModel.predict( self.X[test] )
+                self.fit(self.X[train], self.Y[train])
+                Y_test_pred = self.predict( self.X[test] )
                 MSEs.append( np.mean( (Y_test_pred - self.Y[test]) ** 2 ) )
             
         return np.sqrt( np.mean(np.array(MSEs)) )

@@ -1,152 +1,140 @@
-# Use this for converting Wei's model
-
-import sys
-import os
 import numpy as np
-import matplotlib as mat
-mat.use('Agg')
-import matplotlib.pyplot as plt
 import copy
-import random
 
-#sys.path.append('/home/vlachos/mpnunez/ase')
-sys.path.append('C:\Users\mpnun\Dropbox\Coding\Python_packages\ase')
-from ase.build import fcc111
-from ase.io import read
-from ase.visualize import view
-from ase.io import write
-from ase import Atoms
 from ase.neighborlist import NeighborList
 
-sys.path.append('C:\Users\mpnun\Dropbox\Coding\Python_packages\networkx')
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
-#sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper/zacros_wrapper')
-sys.path.append('C:\Users\mpnun\Dropbox\Github\Zacros-Wrapper\zacros_wrapper')
-from Lattice import Lattice as lat
-#import zacros_wrapper.Lattice as lat
-
-from template import dyno_struc
+from cat_optimization.dynamic_cat import dynamic_cat
+from zacros_wrapper.Lattice import Lattice as lat
 
 
-class Wei_NH3_model(dyno_struc):
+class NiPt_NH3(dynamic_cat):
     
     '''
     Handles a dynamic lattice for Wei's NH3 decomposition model
     Data taken from W. Guo and D.G. Vlachos, Nat. Commun. 6, 8619 (2015).
     '''
     
-    Pt_Pt_1nn_dist = 2.77       # angstrom
-    
     def __init__(self):
         
         '''
-        Call superclass constructor
+        Modify the template atoms object and build defected graph
         '''
         
-        super(Wei_NH3_model, self).__init__()
+        dynamic_cat.__init__(self, fixed_layers = 4, variable_layers = 1)       # Call parent class constructor # 
         
-        self.dim1 = None
-        self.dim2 = None
+        self.KMC_lat = None                 # Zacros Wrapper lattice object 
+        
+        
+        '''
+        Transmute the top layer to Ni
+        '''  
 
-        # Need a class variable that lists the variable nodes of the graph
+        coords = self.atoms_template.get_positions()
+        a_nums = self.atoms_template.get_atomic_numbers()
+        chem_symbs = self.atoms_template.get_chemical_symbols()
         
-    def build_template(self, d1, d2):
-    
-        '''
-        Build a 5-layer Pt(111) slab and transmute the top layer to Ni
-        '''
-    
-        self.dim1 = d1
-        self.dim2 = d2
-    
-        self.ASE_template = fcc111('Pt', size=(self.dim1, self.dim2, 5), vacuum=15.0)
-
-        coords = self.ASE_template.get_positions()
-        a_nums = self.ASE_template.get_atomic_numbers()
-        chem_symbs = self.ASE_template.get_chemical_symbols()
-        
-        # Change top layer atoms to Ni
-        top_layer_z = np.max(coords[:,2])
-        for atom_ind in range(len(self.ASE_template)):
-            if coords[atom_ind,2] > top_layer_z - 0.1:
-                a_nums[atom_ind] = 28
-                chem_symbs[atom_ind] = 'Ni'
+        # Change top layer atoms to Cu and 2nd to top layer to Ni
+        for atom_ind in range(3*self.atoms_per_layer,4*self.atoms_per_layer):
+            a_nums[atom_ind] = 28
+            chem_symbs[atom_ind] = 'Ni'
+        for atom_ind in range(4*self.atoms_per_layer,5*self.atoms_per_layer):
+            a_nums[atom_ind] = 29
+            chem_symbs[atom_ind] = 'Cu'
                 
-        self.ASE_template.set_atomic_numbers(a_nums)
-        self.ASE_template.set_chemical_symbols(chem_symbs)
+        self.atoms_template.set_atomic_numbers(a_nums)
+        self.atoms_template.set_chemical_symbols(chem_symbs)
         
-    
-    def randomize_atoms_missing(self):    
+        self.variable_atoms = range(3*self.atoms_per_layer,4*self.atoms_per_layer)  # 2nd layer from the top is variable
+        self.variable_occs = [1 for i in self.variable_atoms]
         
         '''
-        Randomize the atoms_missing vector
+        Build graph
         '''
         
-        self.ASE_defected = copy.deepcopy(self.ASE_template)
+        n_at = len(self.atoms_template)
         
-        n_var = self.dim1 * self.dim2
-        n_fixed = 4 * self.dim1 * self.dim2
-        n_tot = n_var + n_fixed
+        self.defected_graph = nx.Graph()
+        self.defected_graph.add_nodes_from(range(n_at))       # nodes indexed with integers
         
-        delete_these = [False for i in range(n_tot)]
-        for i in range(n_fixed, n_tot):
-            if random.uniform(0, 1) < 0.5:
-                delete_these[i] = True
+        for i in range(n_at):       # Assign elements and site types in graph
+        
+            if self.atoms_template.get_chemical_symbols()[i] == 'Cu':
+                self.defected_graph.node[i]['element'] = 'vacuum'
+            else:
+                self.defected_graph.node[i]['element'] = self.atoms_template.get_chemical_symbols()[i]
                 
-        delete_these = np.array(delete_these)
-        
-        del self.ASE_defected[delete_these]
-        
-        self.atoms_missing = delete_these
-        
-        
-    def atoms_missing_to_graph3D(self):
-    
-        '''
-        Converts defected ASE atoms object to a NetworkX graph object
-        '''
-    
-        # Set periodic boundary conditions - periodic in x and y directions, aperiodic in the z direction
-        self.ASE_template.set_pbc([True, True, False])
-        self.ASE_defected.set_pbc([True, True, False])
-        n_at = len(self.ASE_template)
+            self.defected_graph.node[i]['site_type'] = None
         
         # Find neighbors based on distances
-        rad_list = ( Wei_NH3_model.Pt_Pt_1nn_dist + 0.2) / 2 * np.ones(n_at)               # list of neighbor radii for each site
+        self.atoms_template.set_pbc([True, True, False])
+        rad_list = ( 2.77 + 0.2) / 2 * np.ones(n_at)               # list of neighbor radii for each site
         neighb_list = NeighborList(rad_list, self_interaction = False)      # set bothways = True to include both ways
-        neighb_list.build(self.ASE_template)
-
-        # Build graph
-        self.molecular_NetX = nx.Graph()
-        self.molecular_NetX.add_nodes_from(range(n_at))       # nodes indexed with integers
-        pos_dict = {}                                       # Used to visualize the graph if needed
-        self.variable_atoms = []
-        
-        for i in range(n_at):
-        
-            if self.ASE_template.get_chemical_symbols()[i] == 'Ni':
-                self.variable_atoms.append(i)
-        
-            if self.atoms_missing[i]:
-                if self.ASE_template.get_chemical_symbols()[i] == 'Ni':
-                    self.molecular_NetX.node[i]['element'] = 'vacancy'
-                elif self.ASE_template.get_chemical_symbols()[i] == 'Cu':
-                    self.molecular_NetX.node[i]['element'] = 'vacuum'
-                else:
-                    print 'No element found'
-                    
-            else:
-                self.molecular_NetX.node[i]['element'] = self.ASE_template.get_chemical_symbols()[i]
-                
-            self.molecular_NetX.node[i]['site_type'] = None
-            pos_dict[i] = self.ASE_template.get_positions()[i,0:2:]
+        neighb_list.build(self.atoms_template)
         
         # Add edges between adjacent atoms
         for i in range(n_at):
             for j in neighb_list.neighbors[i]:
-                self.molecular_NetX.add_edge(i, j)
+                self.defected_graph.add_edge(i, j)
+                
+        self.occs_to_atoms()
+        self.occs_to_graph()
+        
+        
+    def occs_to_graph(self):
+        '''
+        Build graph from occupancies
+        Assign elements in the graph according to occupancies
+        '''
+        
+        for i in range(len(self.variable_occs)):
+        
+            if self.variable_occs[i]:
+                self.defected_graph.node[self.variable_atoms[i]]['element'] = 'Ni'
+            else:
+                self.defected_graph.node[self.variable_atoms[i]]['element'] = 'vacancy'
+
+
+    def graph_to_occs(self):
+        '''
+        Convert graph representation of defected structure to occupancies
+        '''
+        
+        for i in range(len(self.variable_occs)):
+        
+            if self.defected_graph.node[self.variable_atoms[i]]['element'] == 'Ni':
+                self.variable_occs[i] = 1
+            elif self.defected_graph.node[self.variable_atoms[i]]['element'] == 'vacancy':
+                self.variable_occs[i] = 0
+            else:
+                raise NameError('Invalid element type in graph for variable atom.')
+                
+    
+    def get_site_data(self):
+        '''
+        Evaluate the contribution to the current from each site
+        
+        :returns: Array site currents for each active site, 3 columns for 3 sites per atom (top, fcc hollow, hcp hollow)
+        NEED TO IMPLEMENT THIS
+        ''' 
+        site_data = np.zeros([self.atoms_per_layer,3])
+        
+        for i in range(len(self.variable_occs)):
+ 
+            neighb_dict = self.defected_graph[self.variable_atoms[i]]
+            n_Ni_neighbs = 0
+            n_vac_neighbs = 0
+            for key in neighb_dict:
+                if self.defected_graph.node[key]['element'] == 'Ni':
+                    n_Ni_neighbs += 1
+                elif self.defected_graph.node[key]['element'] == 'vacancy':
+                    n_vac_neighbs += 1
+            
+            site_data[i,0] = n_Ni_neighbs * n_vac_neighbs
+        
+        return site_data
         
     
     def flip_atom(self, ind):
@@ -155,18 +143,20 @@ class Wei_NH3_model(dyno_struc):
         ind: Index of the site to change.
         If it is a Ni, change it to a vacancy.
         If it is a vacancy, change it to Ni.
-        '''        
+        '''  
+        super(NiPt_NH3, self).flip_atom(ind)     # Call super class method to change the occupancy vector
+        
         isos_removed = []
-        element_from = self.molecular_NetX.node[ind]['element'] 
+        element_from = self.defected_graph.node[ind]['element'] 
         
         if element_from == 'vacancy':
             
-            self.molecular_NetX.node[ind]['element'] = 'Ni'
+            self.defected_graph.node[ind]['element'] = 'Ni'
             self.atoms_missing[ind] = False
             
         elif element_from == 'Ni':
             
-            self.molecular_NetX.node[ind]['element'] = 'vacancy'
+            self.defected_graph.node[ind]['element'] = 'vacancy'
             self.atoms_missing[ind] = True
                 
         else:
@@ -183,23 +173,26 @@ class Wei_NH3_model(dyno_struc):
             self.target_isos.remove(isom)
 
         # Add new isomorphisms in a neighborhood around site ind
-        neighb = nx.ego_graph(self.molecular_NetX, ind, radius = self.target_diam)         # Take radius around new node
+        neighb = nx.ego_graph(self.defected_graph, ind, radius = self.target_diam)         # Take radius around new node
         GM4 = iso.GraphMatcher(neighb, x.target_graph, node_match=iso.categorical_node_match('element','Au') )
         for subgraph in GM4.subgraph_isomorphisms_iter():
             if ind in subgraph:
                 self.target_isos.append(subgraph)        
         
                     
-    def graph3D_to_KMC_lattice(self):
+    def graph_to_KMClattice(self):
     
         '''
-        Converts NetworkX graph object to a KMC lattice object
+        Converts defected graph to a KMC lattice object
         '''
         
-        if self.molecular_NetX is None:
+        if self.defected_graph is None:
             raise NameError('Lattice graph not yet defined.')
         
-        n_at = len(self.ASE_template)        
+        n_at = len(self.atoms_template)        
+        
+        for i in range(n_at):           # Set all site types as unknown
+            self.defected_graph.node[i]['site_type'] = None
         
         # Prepare a tetrahedron graph which will be useful
         tet_graph = nx.Graph() 
@@ -216,11 +209,11 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['element'] = 'Ni'
         mini_graph.node['C']['element'] = 'Ni'
         mini_graph.node['D']['element'] = 'vacuum'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 1
+            self.defected_graph.node[D_ind]['site_type'] = 1
         
         # 2. Ni_hcp
         mini_graph = copy.deepcopy(tet_graph)
@@ -228,16 +221,16 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['element'] = 'Ni'
         mini_graph.node['C']['element'] = 'Ni'
         mini_graph.node['D']['element'] = 'Pt'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 2
+            self.defected_graph.node[D_ind]['site_type'] = 2
         
         # 3. Ni_top
         for i in range(n_at):
-            if self.molecular_NetX.node[i]['element'] == 'Ni':
-                self.molecular_NetX.node[i]['site_type'] = 3
+            if self.defected_graph.node[i]['element'] == 'Ni':
+                self.defected_graph.node[i]['site_type'] = 3
         
         
         
@@ -248,29 +241,29 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['A']['element'] = 'Ni'
         mini_graph.node['B']['element'] = 'Ni'
         mini_graph.node['C']['element'] = 'vacancy'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             A_ind = inv_map['A']
             B_ind = inv_map['B']
-            self.molecular_NetX.node[A_ind]['site_type'] = 5
-            self.molecular_NetX.node[B_ind]['site_type'] = 5
+            self.defected_graph.node[A_ind]['site_type'] = 5
+            self.defected_graph.node[B_ind]['site_type'] = 5
         
         # 4. Ni corner
         for i in range(n_at):
-            if self.molecular_NetX.node[i]['site_type'] == 5 or self.molecular_NetX.node[i]['site_type'] == 3:     
+            if self.defected_graph.node[i]['site_type'] == 5 or self.defected_graph.node[i]['site_type'] == 3:     
                 n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
-                for neighb in self.molecular_NetX.neighbors(i):               # look though the neighbors of the Ni fcc sites (1)
-                    if self.molecular_NetX.node[neighb]['site_type'] == 3 or self.molecular_NetX.node[neighb]['site_type'] == 4 or self.molecular_NetX.node[neighb]['site_type'] == 5:
+                for neighb in self.defected_graph.neighbors(i):               # look though the neighbors of the Ni fcc sites (1)
+                    if self.defected_graph.node[neighb]['site_type'] == 3 or self.defected_graph.node[neighb]['site_type'] == 4 or self.defected_graph.node[neighb]['site_type'] == 5:
                         n_Ni_neighbs += 1
                 if n_Ni_neighbs <= 3:
-                    self.molecular_NetX.node[i]['site_type'] = 4
+                    self.defected_graph.node[i]['site_type'] = 4
 
         
         # 6. Pt_fcc
         for i in range(n_at):
-            if self.molecular_NetX.node[i]['element'] == 'vacancy':
-                self.molecular_NetX.node[i]['site_type'] = 6
+            if self.defected_graph.node[i]['element'] == 'vacancy':
+                self.defected_graph.node[i]['site_type'] = 6
         
         # 8. Pt_top
         mini_graph = copy.deepcopy(tet_graph)
@@ -278,11 +271,11 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['element'] = 'vacancy'
         mini_graph.node['C']['element'] = 'vacancy'
         mini_graph.node['D']['element'] = 'Pt'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 8
+            self.defected_graph.node[D_ind]['site_type'] = 8
         
         # 7. Pt_hcp 
         mini_graph = copy.deepcopy(tet_graph)
@@ -290,11 +283,11 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['site_type'] = 8
         mini_graph.node['C']['site_type'] = 8
         mini_graph.node['D']['site_type'] = None
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 7
+            self.defected_graph.node[D_ind]['site_type'] = 7
         
         
         
@@ -304,15 +297,15 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['element'] = 'vacancy'
         mini_graph.node['C']['element'] = 'vacancy'
         mini_graph.node['D']['element'] = 'vacuum'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             B_ind = inv_map['B']
             C_ind = inv_map['C']
             D_ind = inv_map['D']
-            self.molecular_NetX.node[B_ind]['site_type'] = 10
-            self.molecular_NetX.node[C_ind]['site_type'] = 10
-            self.molecular_NetX.node[D_ind]['site_type'] = 12
+            self.defected_graph.node[B_ind]['site_type'] = 10
+            self.defected_graph.node[C_ind]['site_type'] = 10
+            self.defected_graph.node[D_ind]['site_type'] = 12
         
         
         
@@ -322,13 +315,13 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['element'] = 'Ni'
         mini_graph.node['C']['element'] = 'vacancy'
         mini_graph.node['D']['element'] = 'vacuum'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             C_ind = inv_map['C']
             D_ind = inv_map['D']
-            self.molecular_NetX.node[C_ind]['site_type'] = 11
-            self.molecular_NetX.node[D_ind]['site_type'] = 14
+            self.defected_graph.node[C_ind]['site_type'] = 11
+            self.defected_graph.node[D_ind]['site_type'] = 14
             
         # 15. s1 and 10. f3
         mini_graph = copy.deepcopy(tet_graph)
@@ -336,23 +329,23 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['element'] = 'Ni'
         mini_graph.node['C']['element'] = 'vacancy'
         mini_graph.node['D']['element'] = 'Pt'
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 15
+            self.defected_graph.node[D_ind]['site_type'] = 15
         
         # 16. f1 and 17. f2
         for i in range(n_at):
-            if self.molecular_NetX.node[i]['site_type'] == 1:     # look though the neighbors of the Ni fcc sites (1)
+            if self.defected_graph.node[i]['site_type'] == 1:     # look though the neighbors of the Ni fcc sites (1)
                 n_edges = 0                 # count the number of neighbors that are Ni edge sites
-                for neighb in self.molecular_NetX.neighbors(i):
-                    if self.molecular_NetX.node[neighb]['site_type'] == 5 or self.molecular_NetX.node[neighb]['site_type'] == 4:
+                for neighb in self.defected_graph.neighbors(i):
+                    if self.defected_graph.node[neighb]['site_type'] == 5 or self.defected_graph.node[neighb]['site_type'] == 4:
                         n_edges += 1
                 if n_edges == 1:
-                    self.molecular_NetX.node[i]['site_type'] = 17
+                    self.defected_graph.node[i]['site_type'] = 17
                 elif n_edges >= 2:
-                    self.molecular_NetX.node[i]['site_type'] = 16
+                    self.defected_graph.node[i]['site_type'] = 16
         
         
         # 18. h1
@@ -361,11 +354,11 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['site_type'] = 3
         mini_graph.node['C']['site_type'] = 5
         mini_graph.node['D']['site_type'] = 2
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 18
+            self.defected_graph.node[D_ind]['site_type'] = 18
         
         # 19. h2
         mini_graph = copy.deepcopy(tet_graph)
@@ -373,28 +366,28 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['site_type'] = 5
         mini_graph.node['C']['site_type'] = 5
         mini_graph.node['D']['site_type'] = 2
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             D_ind = inv_map['D']
-            self.molecular_NetX.node[D_ind]['site_type'] = 19
+            self.defected_graph.node[D_ind]['site_type'] = 19
         
         
         # 9. h5
         for i in range(n_at):
-            if self.molecular_NetX.node[i]['site_type'] == 6:
-                i_pos = self.ASE_template.get_positions()[i,0:2:]
+            if self.defected_graph.node[i]['site_type'] == 6:
+                i_pos = self.atoms_template.get_positions()[i,0:2:]
                 s1_in_range = False
                 
                 for j in range(n_at):
-                    if self.molecular_NetX.node[j]['site_type'] == 15:
-                        j_pos = self.ASE_template.get_positions()[j,0:2:]
+                    if self.defected_graph.node[j]['site_type'] == 15:
+                        j_pos = self.atoms_template.get_positions()[j,0:2:]
 
                         if np.linalg.norm( i_pos - j_pos ) < Wei_NH3_model.Pt_Pt_1nn_dist * 2:
                             s1_in_range = True
                 
                 if s1_in_range:
-                    self.molecular_NetX.node[i]['site_type'] = 9
+                    self.defected_graph.node[i]['site_type'] = 9
 
         
         # 13. h6
@@ -403,13 +396,13 @@ class Wei_NH3_model(dyno_struc):
         mini_graph.node['B']['site_type'] = 8
         mini_graph.node['C']['site_type'] = None
         mini_graph.node['D']['site_type'] = None
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
+        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             A_ind = inv_map['A']
             D_ind = inv_map['D']
-            if self.ASE_template.get_positions()[D_ind,2] - self.ASE_template.get_positions()[A_ind,2] < -0.1: # lower layer than top Pt
-                self.molecular_NetX.node[D_ind]['site_type'] = 13
+            if self.atoms_template.get_positions()[D_ind,2] - self.atoms_template.get_positions()[A_ind,2] < -0.1: # lower layer than top Pt
+                self.defected_graph.node[D_ind]['site_type'] = 13
             
             
         '''
@@ -419,7 +412,7 @@ class Wei_NH3_model(dyno_struc):
         # Set up object KMC lattice
         self.KMC_lat = lat()
         self.KMC_lat.workingdir = self.path
-        self.KMC_lat.lattice_matrix = self.ASE_template.get_cell()[0:2, 0:2]
+        self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
         
         # Wei Nature site names
         #self.KMC_lat.site_type_names = ['Ni_fcc', 'Ni_hcp', 'Ni_top', 'Ni_corner', 'Ni_edge', 'Pt_fcc', 'Pt_hcp', 
@@ -433,124 +426,16 @@ class Wei_NH3_model(dyno_struc):
         # All atoms with a defined site type
         cart_coords_list = []
         for i in range(n_at):
-            if not self.molecular_NetX.node[i]['site_type'] is None:
-                self.KMC_lat.site_type_inds.append(self.molecular_NetX.node[i]['site_type'])
-                cart_coords_list.append( self.ASE_template.get_positions()[i, 0:2:] )
+            if not self.defected_graph.node[i]['site_type'] is None:
+                self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'])
+                cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
         
         self.KMC_lat.set_cart_coords(cart_coords_list)
-        
         self.KMC_lat.Build_neighbor_list(cut = Wei_NH3_model.Pt_Pt_1nn_dist + 0.1)
-        
-        
-    def eval_current_density(self):
-    
-        '''
-        Evaluate the objective function
-        '''
-
-        return len( self.target_isos ) / self.target_mult
-        
-        
-    def eval_surface_energy(self, atom_graph = None, normalize = False):
-                
-        return 0.0
-        
-        
-    def get_GCE_ind(self):
-    
-        if self.variable_atoms is None:
-            raise NameError('Variable atoms not specified.')
-        
-        return random.choice( self.variable_atoms )
-        
-    
-    def get_CE_inds(self):
-    
-        mini_graph = nx.Graph()
-        mini_graph.add_nodes_from(['A', 'B'])
-        mini_graph.add_edge('A','B')
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'vacancy'
-    
-        GM = iso.GraphMatcher(self.molecular_NetX, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        n_choices = 0
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            n_choices += 1
-        
-        if n_choices == 0:
-            raise NameError('No available moves.')
-        
-        ind_to_choose = random.randrange(n_choices)
-        
-        ind = 0
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            if ind == ind_to_choose:
-                inv_map = {v: k for k, v in subgraph.items()}
-                A_ind = inv_map['A']
-                B_ind = inv_map['B']
-                return [A_ind, B_ind]
             
-            ind += 1
-        
-        
-        
-if __name__ == "__main__":
-
-    '''
-    Check to see that our lattice is being built correctly
-    '''
-    
-    sys.setrecursionlimit(1500)             # Needed for large number of atoms
-    
-    # Create object
-    x = Wei_NH3_model()
-    
-    use_files = True
-    
-    if not use_files:
-    
-        # Create structure and randomize
-        x.build_template(12, 12)
-        x.randomize_atoms_missing()
-    
-    else:
-    
-        # Read structures from xsd files
-        x.ASE_template = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\NiPt_template.xsd', format = 'xsd')
-        x.ASE_defected = read('C:\Users\mpnun\Dropbox\MS_projects\ML_cat_struc Files\Documents\defected_7.xsd', format = 'xsd')
-        x.ASE_to_atoms_missing()
-    
-    # Build NetworkX graph of the defected structure
-    x.atoms_missing_to_graph3D()
-    '''
-    # Define patterns to find
-    mini_graph = nx.Graph() 
-    mini_graph.add_nodes_from(['A', 'B', 'C', 'D'])
-    mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['B', 'D'], ['C', 'D']])
-    mini_graph.node['A']['element'] = 'Ni'
-    mini_graph.node['B']['element'] = 'Ni'
-    mini_graph.node['C']['element'] = 'Ni'
-    mini_graph.node['D']['element'] = 'vacancy'
-    x.target_graph = mini_graph
-    
-    # Optimize
-    print 'Starting optimization'
-    x.optimize(n_snaps = 10)
-    x.atoms_missing_to_ASE()
-    write( os.path.join('External', 'optimized.png') , x.ASE_defected )
-    '''
-    # Generate KMC lattice
-    x.graph3D_to_KMC_lattice()
-#    x.KMC_lattice_to_graph2D()
-    
-    '''
-    Write output
-    '''
-    
-    x.KMC_lat.Write_lattice_input('C:\Users\mpnun\Desktop')     # write lattice_input.dat
-    #
-    ## Draw lattice in a png file
-    #plt = x.KMC_lat.PlotLattice()
-    #plt.savefig(os.path.join(x.path, 'kmc_lattice.png'))
-    #plt.close()
-    
+            
+    def show(self, fname = 'structure_1', fmat = 'png', transmute_top = False, chop_top = False):
+        '''
+        Use super class method with top layer transmuted to display
+        '''
+        super(NiPt_NH3, self).show(fname = fname, fmat = fmat, chop_top = True)

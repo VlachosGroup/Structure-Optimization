@@ -93,3 +93,6 @@ ENV/
 *_output.txt
 *.bin
 *.xsd
+*.out
+*.txt
+*.qs
