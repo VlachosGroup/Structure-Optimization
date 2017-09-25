@@ -122,10 +122,10 @@ class orr_cat(dynamic_cat):
                     
         curr_list = np.transpose( np.array(curr_list).reshape([2,self.atoms_per_layer]) )  
         
-        return curr_list
+        return np.sum(curr_list, axis = 1)
                     
                     
-    def eval_current_density(self, normalize = True):
+    def eval_current_density(self, normalize = True, site_currents = None):
         
         '''
         :param normalize: current density [mA/cm^2]
@@ -133,7 +133,8 @@ class orr_cat(dynamic_cat):
         Not normalized: current [mA]
         '''       
         
-        site_currents = self.get_site_data()
+        if site_currents is None:
+            site_currents = self.get_site_data()
         J = np.sum(site_currents)
         
         if normalize:

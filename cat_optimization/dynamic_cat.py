@@ -48,9 +48,9 @@ class dynamic_cat(object):
         total_layers = fixed_layers + variable_layers
         
         if facet == '111' or facet == 111:
-            self.atoms_template = fcc111(met_name, size=(dim1, dim2, total_layers), vacuum=15.0)
+            self.atoms_template = fcc111(met_name, size=(dim1, dim2, total_layers), a = 3.9239, vacuum=15.0)
         elif facet == '100' or facet == 100:
-            self.atoms_template = fcc100(met_name, size=(dim1, dim2, total_layers), vacuum=15.0)
+            self.atoms_template = fcc100(met_name, size=(dim1, dim2, total_layers), a = 3.9239, vacuum=15.0)
         else:
             raise ValueError(str(facet) + ' is not a valid facet.')
             
@@ -86,7 +86,7 @@ class dynamic_cat(object):
         return self.variable_occs
         
     
-    def atoms_to_occs(self, d_cut = 0.001):
+    def atoms_to_occs(self, d_cut = 0.1):
     
         '''
         Convert defected atoms object to variable atom occupancies
@@ -109,10 +109,10 @@ class dynamic_cat(object):
             
             match_found = False
             
-            while (not match_found) and defect_ind < len(ASE_defected):
+            while (not match_found) and defect_ind < len(self.atoms_defected):
             
-                defect_coords = ASE_defected.get_positions()[defect_ind, :]
-                defect_an = ASE_defected.get_atomic_numbers()[defect_ind]
+                defect_coords = self.atoms_defected.get_positions()[defect_ind, :]
+                defect_an = self.atoms_defected.get_atomic_numbers()[defect_ind]
                 dist = np.linalg.norm( cart_coords - defect_coords )
                 match_found = (dist < d_cut) #and (defect_an == atomic_num)         # Second condition checks whether the elements match
                 defect_ind += 1
@@ -160,13 +160,25 @@ class dynamic_cat(object):
         self.occs_to_graph()
         self.occs_to_atoms()
         
+    
+    def load_defects(self,fname):
+        '''
+        Get defect information from a file
+        '''
+        self.atoms_defected = read(fname)
+        self.atoms_defected.set_cell( self.atoms_template.get_cell() ) # copy cell from template
+        self.atoms_to_occs()
+        self.occs_to_graph()
         
+    
     def flip_atom(self, ind):
         
         '''
         If atom number ind is present in the defected graph, remove it.
         If it is not present, add it and all edges to adjacent atoms.
         '''
+        
+        ind = self.variable_atoms.index(ind)    # switch from atom index to index of the occupancy vector
         if self.variable_occs[ind] == 1:
             self.variable_occs[ind] = 0
         elif self.variable_occs[ind] == 0:
@@ -321,6 +333,8 @@ class dynamic_cat(object):
         # Build ASE atoms object from defected graph
         if self.atoms_defected is None:
             self.occs_to_atoms()
+        
+        self.atoms_defected.set_pbc(True)
         
         if transmute_top or chop_top:
             coords = self.atoms_defected.get_positions()

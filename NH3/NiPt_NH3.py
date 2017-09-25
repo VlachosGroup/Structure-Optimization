@@ -17,13 +17,13 @@ class NiPt_NH3(dynamic_cat):
     Data taken from W. Guo and D.G. Vlachos, Nat. Commun. 6, 8619 (2015).
     '''
     
-    def __init__(self):
+    def __init__(self, dimen = 12):
         
         '''
         Modify the template atoms object and build defected graph
         '''
         
-        dynamic_cat.__init__(self, fixed_layers = 4, variable_layers = 1)       # Call parent class constructor # 
+        dynamic_cat.__init__(self, dim1 = dimen, dim2 = dimen, fixed_layers = 4, variable_layers = 1)       # Call parent class constructor # 
         
         self.KMC_lat = None                 # Zacros Wrapper lattice object 
         
@@ -132,7 +132,8 @@ class NiPt_NH3(dynamic_cat):
                 elif self.defected_graph.node[key]['element'] == 'vacancy':
                     n_vac_neighbs += 1
             
-            site_data[i,0] = n_Ni_neighbs * n_vac_neighbs
+            if self.defected_graph.node[self.variable_atoms[i]]['element'] == 'Ni':     # Only active if a Ni atom is present
+                site_data[i,0] = n_Ni_neighbs * n_vac_neighbs
         
         return site_data
         
@@ -383,7 +384,7 @@ class NiPt_NH3(dynamic_cat):
                     if self.defected_graph.node[j]['site_type'] == 15:
                         j_pos = self.atoms_template.get_positions()[j,0:2:]
 
-                        if np.linalg.norm( i_pos - j_pos ) < Wei_NH3_model.Pt_Pt_1nn_dist * 2:
+                        if np.linalg.norm( i_pos - j_pos ) < 2.77 * 2:
                             s1_in_range = True
                 
                 if s1_in_range:
@@ -411,7 +412,6 @@ class NiPt_NH3(dynamic_cat):
         
         # Set up object KMC lattice
         self.KMC_lat = lat()
-        self.KMC_lat.workingdir = self.path
         self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
         
         # Wei Nature site names
@@ -431,11 +431,11 @@ class NiPt_NH3(dynamic_cat):
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
         
         self.KMC_lat.set_cart_coords(cart_coords_list)
-        self.KMC_lat.Build_neighbor_list(cut = Wei_NH3_model.Pt_Pt_1nn_dist + 0.1)
+        self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)
             
             
     def show(self, fname = 'structure_1', fmat = 'png', transmute_top = False, chop_top = False):
         '''
         Use super class method with top layer transmuted to display
         '''
-        super(NiPt_NH3, self).show(fname = fname, fmat = fmat, chop_top = True)
+        super(NiPt_NH3, self).show(fname = fname, fmat = fmat, chop_top = chop_top)

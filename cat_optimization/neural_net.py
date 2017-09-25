@@ -54,6 +54,8 @@ class NeuralNetwork(MLPRegressor):
         
         self.X = None           # numpy array of x values
         self.Y = None           # numpy array of y values
+        self.Y_norm = 1
+        
         self.X_scaler = None        
         self.Y_scaler = None        # Use the StandardScaler class
             
@@ -80,8 +82,13 @@ class NeuralNetwork(MLPRegressor):
             self.Y = Y_plus
         else:
             self.X = np.vstack( [ self.X , X_plus ] )
-            self.Y = np.vstack( [ self.Y , Y_plus ] )
+            if len(self.Y.shape) == 1:      # If y is a 1-D array
+                self.Y = np.hstack( [ self.Y , Y_plus ] )
+            else:
+                self.Y = np.vstack( [ self.Y , Y_plus ] )
             original = False
+        
+        self.Y_norm = np.max(self.Y)
         
         # Regress the neural network
         CPU_start = time.time()
@@ -90,14 +97,14 @@ class NeuralNetwork(MLPRegressor):
         
         original = True         # partial fit is not giving me good results...
         if original:            # Fitting the model for the first time
-            self.fit(self.X, self.Y)
+            self.fit(self.X, self.Y / self.Y_norm)
         else:                   # Refining the model
             self.partial_fit(X_plus, Y_plus)
         
         CPU_end = time.time()
         print('Neural network training time: ' + str(CPU_end - CPU_start) + ' seconds')
         
-        self.Y_nn = self.predict( self.X )      # store predicted values
+        self.Y_nn = self.Y_norm * self.predict( self.X )      # store predicted values
 
 
     def plot_parity(self, fname = 'parity.png', title = None, logscale = False, limits = None):
@@ -154,8 +161,11 @@ class NeuralNetwork(MLPRegressor):
             
             if logscale:
                 plt.yscale('log')
-                
-            plt.savefig('Y_' + str(i+1) + '_' + fname)
+            
+            if Y_d > 1:            
+                plt.savefig('Y_' + str(i+1) + '_' + fname)
+            else:
+                plt.savefig(fname)
             plt.close()
         
     
