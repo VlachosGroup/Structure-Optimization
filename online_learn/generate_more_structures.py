@@ -20,6 +20,7 @@ def build_KMC_input(cat, fldr_name, trajectory = None):
     
     if not os.path.exists(fldr_name):
         os.makedirs(fldr_name)
+    os.system('rm ' + fldr_name + '/*')     # clear folder contents
     
     # Show the structure you have generated in the KMC folder
     cat.show(fname = os.path.join(fldr_name,'structure'), fmat = 'png', chop_top = True)

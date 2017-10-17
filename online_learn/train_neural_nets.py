@@ -162,7 +162,10 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
             if sites_are_active[site_ind] == 1.:
                 active_site_list.append(site_ind)
         
-        structure_rates_NN[struc_ind] = np.sum( nn_pred.predict( all_trans[active_site_list,:] ) )
+        if active_site_list == []:
+            structure_rates_NN[struc_ind] = 0
+        else:
+            structure_rates_NN[struc_ind] = np.sum( nn_pred.predict( all_trans[active_site_list,:] ) )
         
         struc_ind += 1
     

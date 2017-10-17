@@ -25,10 +25,13 @@ Generate data set
 
 
 def square(i):
+
+    np.random.seed(i)
+
     n_strucs = 96
     cat = NiPt_NH3_simple()
     
-    fldr_name = 'structure_' + str(i+1)
+    fldr_name = os.path.join( '/home/vlachos/mpnunez/NN_data/AB_data/KMC_DB', 'structure_' + str(i+1) )
     n_tops = int( (10 + 10 * float(i) / (n_strucs+1)))
     
     
@@ -39,7 +42,6 @@ def square(i):
     
     if not os.path.exists(fldr_name):
         os.makedirs(fldr_name)
-    cat.show(os.path.join(fldr_name, 'before_annealed'), fmat = 'png', chop_top = True)
     
     top_sites = np.random.choice( range(len(cat.variable_atoms)), size=n_tops, replace=False )
     
@@ -68,9 +70,9 @@ def square(i):
     cat.show(fname = os.path.join(fldr_name,'structure'), fmat = 'png', chop_top = True)
     cat.show(fname = os.path.join(fldr_name,'structure'), fmat = 'xsd', chop_top = False)
 
-    os.system('cp KMC_input/simulation_input.dat ' + fldr_name)
-    os.system('cp KMC_input/mechanism_input.dat ' + fldr_name)
-    os.system('cp KMC_input/energetics_input.dat ' + fldr_name)
+    os.system('cp /home/vlachos/mpnunez/NN_data/AB_data/KMC_input/simulation_input.dat ' + fldr_name)
+    os.system('cp /home/vlachos/mpnunez/NN_data/AB_data/KMC_input/mechanism_input.dat ' + fldr_name)
+    os.system('cp /home/vlachos/mpnunez/NN_data/AB_data/KMC_input/energetics_input.dat ' + fldr_name)
     
     cat.graph_to_KMClattice()
     cat.KMC_lat.Write_lattice_input(fldr_name)
