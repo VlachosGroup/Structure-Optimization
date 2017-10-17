@@ -292,7 +292,7 @@ class dynamic_cat(object):
         
         for var_ind in range(n_var):
             d1, d2 = self.var_ind_to_sym_inds(var_ind)
-            map_from_ind = self.sym_inds_to_var_ind( d1 - shift1 , d2 - shift2 )
+            map_from_ind = self.sym_inds_to_var_ind( d1 + shift1 , d2 + shift2 )
             new_occs[var_ind] = self.variable_occs[ map_from_ind ]
             
         return new_occs

@@ -118,12 +118,13 @@ class orr_cat(dynamic_cat):
                     gcn = self.defected_graph.get_generalized_coordination_number(site_ind, 12)
                     BE_OH = self.metal.get_OH_BE(gcn)
                     BE_OOH = self.metal.get_OOH_BE(gcn)
-                    curr_list[i] = ORR_rate(BE_OH, BE_OOH)
+                    #curr_list[i] = ORR_rate(BE_OH, BE_OOH)
+                    curr_list[i] = gcn
                     
         curr_list = np.transpose( np.array(curr_list).reshape([2,self.atoms_per_layer]) )  
         
-        return np.sum(curr_list, axis = 1)
-                    
+        #return np.sum(curr_list, axis = 1)
+        return curr_list[:,0]
                     
     def eval_current_density(self, normalize = True, site_currents = None):
         

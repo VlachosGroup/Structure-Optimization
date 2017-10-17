@@ -10,7 +10,7 @@ from cat_optimization.dynamic_cat import dynamic_cat
 from zacros_wrapper.Lattice import Lattice as lat
 
 
-class NiPt_NH3(dynamic_cat):
+class NiPt_NH3_simple(dynamic_cat):
     
     '''
     Handles a dynamic lattice for Wei's NH3 decomposition model
@@ -145,7 +145,7 @@ class NiPt_NH3(dynamic_cat):
         If it is a Ni, change it to a vacancy.
         If it is a vacancy, change it to Ni.
         '''  
-        super(NiPt_NH3, self).flip_atom(ind)     # Call super class method to change the occupancy vector
+        super(NiPt_NH3_simple, self).flip_atom(ind)     # Call super class method to change the occupancy vector
         
         isos_removed = []
         element_from = self.defected_graph.node[ind]['element'] 
@@ -424,18 +424,14 @@ class NiPt_NH3(dynamic_cat):
         #'hcp_Pt',	'top_Pt', 'hcp_2edge_Pt_3fcc',	'fcc_edge_Pt_3fcc',	'fcc_edge_Pt_3hcp',	'hcp_edge_Pt_3fcc',	'hcp_edge_Pt_3hcp',
         #    'step_100',	'step_110',	'fcc_edge_Ni_3fcc',	'fcc_edge_Ni_3hcp',	'hcp_edge_Ni_3fcc',	'hcp_edge_Ni_3hcp']
         
-        self.KMC_lat.site_type_names = ['fcc_Ni',	'hcp_Ni',	'top_Ni',	'top_corner_Ni',	'top_edge_Ni',
-            'step_100',	'step_110',	'fcc_edge_Ni_3fcc',	'fcc_edge_Ni_3hcp',	'hcp_edge_Ni_3fcc',	'hcp_edge_Ni_3hcp']
+        self.KMC_lat.site_type_names = ['top_Ni',	'top_corner_Ni',	'top_edge_Ni']
         
         # All atoms with a defined site type
         cart_coords_list = []
         for i in range(n_at):
             #if not self.defected_graph.node[i]['site_type'] is None:
-            if self.defected_graph.node[i]['site_type'] in [1,2,3,4,5,14,15,16,17,18,19]:
-                if self.defected_graph.node[i]['site_type'] > 12:
-                    self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'] - 8)
-                else:
-                    self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'])
+            if self.defected_graph.node[i]['site_type'] in [3,4,5]:
+                self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'] - 2)
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
         
         self.KMC_lat.set_cart_coords(cart_coords_list)
@@ -446,4 +442,4 @@ class NiPt_NH3(dynamic_cat):
         '''
         Use super class method with top layer transmuted to display
         '''
-        super(NiPt_NH3, self).show(fname = fname, fmat = fmat, chop_top = chop_top)
+        super(NiPt_NH3_simple, self).show(fname = fname, fmat = fmat, chop_top = chop_top)

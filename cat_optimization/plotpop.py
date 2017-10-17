@@ -42,10 +42,11 @@ def plot_pop_SO(data, fname = None, title = None):
     :param title: Title for the graph.
     '''    
     
-    plt.hist(data, bins = [i * 5 for i in range(21)])
+    #plt.hist(data, bins = [i * 5 for i in range(21)])
+    plt.hist(data, bins = 50)
     plt.xlabel('Curent density (mA/cm^2)', size=24)
     plt.ylabel('Frequency', size=24)
-    plt.xlim([0, 100])
+    #plt.xlim([0, 100])
     #plt.ylim([0, 300])
     plt.xticks(size=20)
     plt.yticks(size=20)

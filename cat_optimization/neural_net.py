@@ -62,7 +62,7 @@ class NeuralNetwork(MLPRegressor):
         self.Y_nn = None        # y values predicted by the neural network
     
     
-    def refine(self, X_plus, Y_plus):
+    def refine(self, X_plus, Y_plus, weight_active = True):
         
         '''
         Add new data to the training set and retrain
@@ -89,6 +89,32 @@ class NeuralNetwork(MLPRegressor):
             original = False
         
         self.Y_norm = np.max(self.Y)
+        
+        '''
+        Weight the most active sites
+        '''
+        
+        if weight_active:
+        
+            active_cutoff = 0.07
+            target_active = 0.5
+            
+            n_data = len(self.Y)
+            n_inactive = 0
+            for i in range(n_data):
+                if self.Y[i] / self.Y_norm < active_cutoff:
+                    n_inactive += 1
+            n_active = n_data - n_inactive
+            
+                    
+            weight = int( target_active * n_inactive / n_active / ( 1 - target_active ) ) 
+            
+            # Duplicate active sites
+            for i in range(n_data):
+                if self.Y[i] / self.Y_norm >= active_cutoff:
+                    for j in xrange(weight):
+                        self.X = np.vstack([self.X, self.X[i,:]])
+                        self.Y = np.hstack([self.Y, np.array(self.Y[i])])
         
         # Regress the neural network
         CPU_start = time.time()
