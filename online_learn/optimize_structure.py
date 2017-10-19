@@ -46,7 +46,7 @@ def rand_move(sigma):
     return sigma_new
 
 
-def optimize(cat, nn_class, nn_pred):
+def optimize(input):
     
     '''
     Simulated annealing optimization - maximizes the objective function
@@ -56,18 +56,23 @@ def optimize(cat, nn_class, nn_pred):
     :param nn_pred: Prediction neural network
     '''
     
-    total_steps = 100
+    cat = input[0]
+    nn_class = input[1]
+    nn_pred = input[2]
+    
+    total_steps = 100 * len( cat.variable_occs )
     
     #initial_T = 0.6
     initial_T = 0
-    c = 1.
+    c = 0.5
     
     # Trajectory recording parameters
     n_record = 100
     step_rec = np.zeros(n_record+1)
     OF_rec = np.zeros(n_record+1)
     record_ind = 0
-    
+    steps_to_record = np.linspace(0, total_steps,  n_record+1 )
+    steps_to_record = steps_to_record.astype(int)
     
     # Evaluate initial structure
     x = cat.variable_occs
@@ -101,15 +106,15 @@ def optimize(cat, nn_class, nn_pred):
             OF = OF_new
         
         # Record data
-        if (step+1) % (total_steps / n_record) == 0:
+        if (step+1) in steps_to_record:
             step_rec[record_ind] = step+1
             OF_rec[record_ind] = OF
             record_ind += 1
         
             
     CPU_end = time.time()
-    #print('Time elapsed: ' + str(CPU_end - CPU_start) )
+    print('Simulated annealing time elapsed: ' + str(CPU_end - CPU_start) )
     
     cat.assign_occs(x)
 
-    return [step_rec, OF_rec]
+    return [ x , np.array([step_rec, OF_rec])]

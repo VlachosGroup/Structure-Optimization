@@ -262,8 +262,8 @@ class dynamic_cat(object):
         ''' Revert last move for simulated annealing '''
         self.flip_atom(self.atom_last_moved)
         
-        
-    def generate_all_translations(self):
+    
+    def generate_all_translations(self, local = False):
         '''
         Generate a symmetery matrix which has all possible translations of the
         sites within the unit cell
@@ -272,9 +272,9 @@ class dynamic_cat(object):
         all_translations = []
         n_var = len(self.variable_atoms)
         for var_ind in range(n_var):
-            d1, d2 = self.var_ind_to_sym_inds(var_ind)    
+            d1, d2 = self.var_ind_to_sym_inds(var_ind)
             all_translations.append( self.variable_shift( d1, d2) )
-                
+
         return np.array(all_translations)
 
         
@@ -289,12 +289,31 @@ class dynamic_cat(object):
         
         n_var = len(self.variable_atoms)
         new_occs = np.zeros(n_var)
-        
         for var_ind in range(n_var):
             d1, d2 = self.var_ind_to_sym_inds(var_ind)
             map_from_ind = self.sym_inds_to_var_ind( d1 + shift1 , d2 + shift2 )
             new_occs[var_ind] = self.variable_occs[ map_from_ind ]
-            
+                
+        return new_occs
+
+  
+    def get_local_inds(self, shift1=0, shift2=0):
+        '''
+        Permute occupancies according to symmetry
+        
+        :param shift1: Number of indices to translate along first axis
+        
+        :param shift2: Number of indices to translate along second axis
+        '''
+        
+        n_var = len(self.variable_atoms)
+        new_occs = []
+        for var_ind in range(n_var):
+            d1, d2 = self.var_ind_to_sym_inds(var_ind)
+            if np.abs(d1) <= 3 and np.abs(d2) <= 3:
+                map_from_ind = self.sym_inds_to_var_ind( d1 + shift1 , d2 + shift2 )
+                new_occs.append(map_from_ind)
+                
         return new_occs
         
     

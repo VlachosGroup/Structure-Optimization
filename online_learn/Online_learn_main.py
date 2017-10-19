@@ -25,28 +25,21 @@ from generate_more_structures import *
 
 if __name__ == '__main__':
 
-    initial_DB_size = 96
-    gen_size = 3                    # 96 KMC simulations can run at one time
+    initial_DB_size = 113
+    gen_size = 16                    # 96 KMC simulations can run at one time
     start_iteration = 1
-    end_iteration = 2
+    end_iteration = 10
     data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data'
     DB_fldr = './KMC_DB'        # relative to data_fldr
     
     os.chdir(data_fldr)
-    
-    # Initialize optimization with random structures
-    structure_list = [NiPt_NH3_simple() for i in xrange(gen_size)]
-    for struc in structure_list:
-        struc.randomize()
-    
     
     '''
     Read KMC data -> build X and Y
     '''
     
     # Read from existing pickle file
-    #if os.path.isfile('Iteration_0_X.npy'): 
-    if False: 
+    if os.path.isfile('Iteration_0_X.npy'): 
     
         structure_occs = np.load('Iteration_0_X.npy')
         site_propensities = np.load('Iteration_0_Y.npy')
@@ -56,29 +49,38 @@ if __name__ == '__main__':
     
         fldr_list = [os.path.join(DB_fldr, 'structure_' + str(i+1) ) for i in xrange(initial_DB_size)]
     
+        # Run in parallel
+        pool = Pool()
+        x_vec = pool.map(read_x, fldr_list)
+        pool.close()
         
-        for dir in fldr_list:
-            read_x(dir)
-            read_y(dir)
-    
-        ## Run in parallel
-        #pool = Pool()
-        #x_vec = pool.map(read_x, fldr_list)
-        #pool.close()
-        #
-        #pool = Pool()
-        #y_vec = pool.map(read_y, fldr_list)
-        #pool.close()
-        #
-        #structure_occs = np.array(x_vec)
-        #site_propensities = np.array(y_vec)
+        pool = Pool()
+        y_vec = pool.map(read_y, fldr_list)
+        pool.close()
         
-        #np.save('Iteration_0_X.npy', structure_occs)
-        #np.save('Iteration_0_Y.npy', site_propensities)
+        structure_occs = np.array(x_vec)
+        site_propensities = np.array(y_vec)
+        
+        np.save('Iteration_0_X.npy', structure_occs)
+        np.save('Iteration_0_Y.npy', site_propensities)
     
     structure_occs_new = None
     site_propensities_new = None
-    raise NameError('stop')
+
+    
+    # Initialize optimization with random structures
+    structure_list = [NiPt_NH3_simple() for i in xrange(gen_size)]
+    intial_struc_inds = random.sample(range(initial_DB_size), gen_size)     # choose some of training structures as initial structures
+    
+    for i in range(gen_size):
+        structure_list[i].assign_occs( structure_occs[ intial_struc_inds[i], :] )
+    
+    #for struc in structure_list:
+    #    struc.randomize()           # Use an initial random structure or a training structure
+    
+    '''
+    Online learning loop
+    '''
     
     for iteration in range(start_iteration-1, end_iteration):
 
@@ -91,28 +93,42 @@ if __name__ == '__main__':
         # If this isn't the first iteration, add data from new structures
         if iteration > 0:
             structure_occs = np.vstack([structure_occs, structure_occs_new])
-            site_propensities = np.stack([site_propensities, site_propensities_new], axis = 0)
+            site_propensities = np.concatenate([site_propensities, site_propensities_new], axis = 0)
         
         nn_list = train_neural_nets(structure_occs, site_propensities, iter_num = iteration+1)
         nn_class = nn_list[0]
         nn_pred = nn_list[1]
-        
-        
+        structure_rates_KMC = nn_list[2]
+        structure_rates_NN = nn_list[3]
+
         '''
         Optimize: neural network objects + initial structures -> optimized structures
         '''
         
-        # NEED TO PARALLELIZE / SPEED UP
+        input_list = [ [ struc, nn_class, nn_pred ] for struc in structure_list ]
         
-        #pool = Pool()
-        #structure_pop = pool.map(optimize, structure_pop)
-        #pool.close()
+        pool = Pool()
+        #trajectory_list = pool.map(optimize, input_list)
+        outputs = pool.map(optimize, input_list)
+        pool.close()
+        
         trajectory_list = []
         predicted_activities = []
-        for struc in structure_list:
-            trajectory = optimize(struc, nn_class, nn_pred)
-            trajectory_list.append(np.array(trajectory))
-            predicted_activities.append(trajectory[1][-1])
+        for i in range(len(outputs)):
+            structure_list[i].assign_occs(outputs[i][0])
+            traj = outputs[i][1]
+            trajectory_list.append(traj)
+            predicted_activities.append(traj[1][-1])
+            
+        
+        
+        # Serial version
+        #trajectory_list = []
+        #predicted_activities = []
+        #for struc in structure_list:
+        #    trajectory = optimize(struc, nn_class, nn_pred)
+        #    trajectory_list.append(np.array(trajectory))
+        #    predicted_activities.append(trajectory[1][-1])
         
         predicted_activities = np.array(predicted_activities)
         
@@ -125,7 +141,7 @@ if __name__ == '__main__':
         for new_calc_ind in xrange(gen_size):
             build_KMC_input(structure_list[new_calc_ind], os.path.join(DB_fldr, 'structure_' + str(n_fldrs + new_calc_ind + 1) ),
                     trajectory = trajectory_list[new_calc_ind])
-        
+
         '''
         Run KMC simulations
         '''
@@ -168,8 +184,9 @@ if __name__ == '__main__':
         np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_propensities_new)
         
         plt.figure()
-        plt.plot(structure_rates_KMC_new, predicted_activities, 'o')
-        all_point_values = np.hstack([structure_rates_KMC_new, predicted_activities])
+        plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
+        plt.plot(structure_rates_KMC_new, predicted_activities, '^')
+        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new, predicted_activities])
         par_min = min( all_point_values )
         par_max = max( all_point_values )
         plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
@@ -180,7 +197,7 @@ if __name__ == '__main__':
         plt.ylabel('Neural network', size=24)
         #plt.xlim([0, 0.50])
         #plt.ylim([0, 0.50])
-        #plt.legend(['train', 'test'], loc=4, prop={'size':20}, frameon=False)
+        plt.legend(['train', 'optima'], loc=4, prop={'size':20}, frameon=False)
         plt.tight_layout()
         plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
         plt.close()

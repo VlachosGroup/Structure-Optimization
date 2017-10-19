@@ -65,17 +65,17 @@ def read_y(fldr_name):
          
     
     '''
-    Check if rate is correct
+    Check that the rate has been comptued correctly
     '''
     
-    rate_specnum = - (x.specnumout.spec[-1,2] - x.specnumout.spec[0,2]) / ( x.specnumout.t[-1] - x.specnumout.t[0] )
-    rate_props = ( x.propCounter[-1,0] - x.propCounter[0,0] ) / ( x.specnumout.t[-1] - x.specnumout.t[0] )
-    rate_siteprops = np.sum( site_props_ss[:,0] - site_props_ss[:,1] )
-    
-    print '\n'
-    print fldr_name
-    print 'From spec_num:\t' + str(rate_specnum)
-    print 'From propensities:\t' + str(rate_props)
-    print 'From site props:\t' + str(rate_siteprops)
+    # rate_specnum = - (x.specnumout.spec[-1,2] - x.specnumout.spec[0,2]) / ( x.specnumout.t[-1] - x.specnumout.t[0] )
+    # rate_props = ( ( x.propCounter[-1,0] - x.propCounter[-1,1] ) - ( x.propCounter[0,0] - x.propCounter[0,1])  ) / ( x.specnumout.t[-1] - x.specnumout.t[0] )
+    # rate_siteprops = np.sum( site_props_ss[:,0] - site_props_ss[:,1] )
+    # 
+    # print '\n'
+    # print fldr_name
+    # print 'From spec_num:\t' + str(rate_specnum)
+    # print 'From propensities:\t' + str(rate_props)
+    # print 'From site props:\t' + str(rate_siteprops)
     
     return site_props_ss
