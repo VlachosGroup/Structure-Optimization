@@ -12,7 +12,7 @@ import pickle
 from sklearn.neural_network import MLPClassifier
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
-
+import time
 
 from multiprocessing import Pool
 from NH3.NiPt_NH3_simple import NiPt_NH3_simple
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     '''
     Create X
     '''
-    
+    CPU_start = time.time()
     cat = NiPt_NH3_simple()
     all_x = None
     
@@ -161,7 +161,9 @@ if __name__ == '__main__':
         print 'Fraction wrong in training set: ' + str(frac_wrong_train)
         
         good_enough = frac_wrong_train < 0.01        # Need classification to be at least 99% accurate
+        good_enough = True
         attempts += 1
+    
     
     '''
     Train neural network - Regression
@@ -200,8 +202,12 @@ if __name__ == '__main__':
         print 'Mean absolute error: ' + str(mae)
         
         good_enough = mae / np.mean(Y_reg) < 0.5       # error in quantitative predictions must be within 25% of the mean value
+        good_enough = True
         attempts += 1
-        
+    
+    CPU_end = time.time()
+    print('Simulated annealing time elapsed: ' + str(CPU_end - CPU_start) )    
+    raise NameError('stop')
     
     '''
     Parity plot for the neural network fit

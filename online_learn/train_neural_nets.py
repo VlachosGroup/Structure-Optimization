@@ -96,6 +96,7 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
         print 'Fraction wrong in training set: ' + str(frac_wrong_train)
         
         good_enough = frac_wrong_train < 0.01        # Need classification to be at least 99% accurate
+	good_enough = True
         attempts += 1
     
     '''
@@ -124,6 +125,7 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
         print 'Mean absolute error: ' + str(mae)
         
         good_enough = mae / np.mean(Y_reg) < 0.5       # error in quantitative predictions must be within 25% of the mean value
+	good_enough = True
         attempts += 1
         
     
