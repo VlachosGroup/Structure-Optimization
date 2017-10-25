@@ -273,18 +273,18 @@ class dynamic_cat(object):
         n_var = len(self.variable_atoms)
         for var_ind in range(n_var):
             d1, d2 = self.var_ind_to_sym_inds(var_ind)
-            all_translations.append( self.variable_shift( d1, d2) )
+            all_translations.append( self.translate( d1, d2) )
 
         return np.array(all_translations)
 
         
-    def variable_shift(self, shift1, shift2):
+    def translate(self, shift1, shift2):
         '''
         Permute occupancies according to symmetry
         
-        :param shift1: Number of indices to translate along first axis
+        :param shift1: Number of indices to translate to the left along first axis
         
-        :param shift2: Number of indices to translate along second axis
+        :param shift2: Number of indices to translate downward along second axis
         '''
         
         n_var = len(self.variable_atoms)
@@ -295,6 +295,58 @@ class dynamic_cat(object):
             new_occs[var_ind] = self.variable_occs[ map_from_ind ]
                 
         return new_occs
+        
+    
+    def generate_all_translations_and_rotations(self):
+        
+        all_translations = []
+        n_var = len(self.variable_atoms)
+        
+        for var_ind in range(n_var):
+            d1, d2 = self.var_ind_to_sym_inds(var_ind)
+            translated = self.translate( d1, d2)
+            
+            for angle in [0,1,2]:
+                all_translations.append( self.rotate( angle, old_occs = translated ) )
+
+        return np.array(all_translations)
+    
+    
+    def rotate(self, i, old_occs = None):
+        '''
+        Permute occupancies according to symmetry
+        
+        :param i: Rotate the catalyst by 120i degrees (clockwise or counterclockwise?)
+        '''
+        
+        if old_occs is None:
+            old_occs = self.variable_occs
+        
+        i = i%3
+        
+        if i == 0:
+            return old_occs
+        else:
+        
+            n_var = len(self.variable_atoms)
+            new_occs = np.zeros(n_var)
+            for var_ind in range(n_var):
+            
+                d1, d2 = self.var_ind_to_sym_inds(var_ind)
+                
+                if i == 1:
+                    d1_new = -d1 - d2
+                    d2_new = d1
+                elif i == 2:
+                    d1_new = d2
+                    d2_new = -d1 - d2
+                else:
+                    raise NameError('Error in rotations.')
+                
+                map_from_ind = self.sym_inds_to_var_ind( d1_new , d2_new )
+                new_occs[var_ind] = old_occs[ map_from_ind ]
+                    
+            return new_occs
 
   
     def get_local_inds(self, shift1=0, shift2=0):

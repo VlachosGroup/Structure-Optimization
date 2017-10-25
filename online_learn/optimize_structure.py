@@ -11,10 +11,12 @@ import os
 Objective function
 '''
 
-def eval_rate(cat, sigma, nn_class, nn_pred):
+def eval_rate(all_trans, nn_class, nn_pred, normalize_fac = 144):
 
-    cat.variable_occs = sigma
-    all_trans = cat.generate_all_translations()
+    
+    if all_trans is None:
+        cat.variable_occs = sigma
+        all_trans = cat.generate_all_translations()
     sites_are_active = nn_class.predict(all_trans)
     
     active_site_list = []
@@ -25,25 +27,8 @@ def eval_rate(cat, sigma, nn_class, nn_pred):
     if active_site_list == []:
         return 0
     else:
-        return np.sum( nn_pred.predict( all_trans[active_site_list,:] ) )
+        return np.sum( nn_pred.predict( all_trans[active_site_list,:] ) ) / normalize_fac
 
-
-'''
-Random move
-'''    
-def rand_move(sigma):
-
-    sigma_new = [i for i in sigma]
-    ind = random.choice(range(len(sigma_new)))
-
-    if sigma_new[ind] == 1:
-        sigma_new[ind] = 0
-    elif sigma_new[ind] == 0:
-        sigma_new[ind] = 1
-    else:
-        raise NameError('Invalid occupancy')
-
-    return sigma_new
 
 
 def optimize(input):
@@ -61,6 +46,7 @@ def optimize(input):
     nn_pred = input[2]
     
     total_steps = 100 * len( cat.variable_occs )
+    #total_steps = 100          # for debugging
     
     #initial_T = 0.6
     initial_T = 0
@@ -76,7 +62,8 @@ def optimize(input):
     
     # Evaluate initial structure
     x = cat.variable_occs
-    OF = eval_rate(cat, x, nn_class, nn_pred)
+    syms = cat.generate_all_translations()
+    OF = eval_rate(syms, nn_class, nn_pred, normalize_fac = 1)
     
     # Record data
     step_rec[record_ind] = 0
@@ -89,8 +76,35 @@ def optimize(input):
         
         #Metro_temp = initial_T * (1 - float(step) / total_steps)            # Linear cooling schedule
         Metro_temp = c / np.log(step+2)                                                      # Logarithmic cooling schedule
-        x_new = rand_move(x)                                                # Do a Metropolis move
-        OF_new = eval_rate(cat, x_new, nn_class, nn_pred)           # Evaluate the new structure and determine whether or not to accept
+        
+        
+        '''
+        Random move
+        '''
+        
+        x_new = [i for i in x]
+        syms_new = np.copy(syms)
+        ind = random.choice(range(len(x_new)))
+    
+        if x_new[ind] == 1:
+            x_new[ind] = 0
+        elif x_new[ind] == 0:
+            x_new[ind] = 1
+        else:
+            raise NameError('Invalid occupancy')
+    
+        d_flip_1, d_flip_2 = cat.var_ind_to_sym_inds(ind)
+        for i in range(len(x)):
+            d1, d2 = cat.var_ind_to_sym_inds(i)
+            ind_to_flip = cat.sym_inds_to_var_ind(d_flip_1 - d1, d_flip_2 - d2)
+            syms_new[i,ind_to_flip] = x_new[ind]
+
+        
+        '''
+        End random move
+        '''
+        
+        OF_new = eval_rate(syms_new, nn_class, nn_pred, normalize_fac = 1)           # Evaluate the new structure and determine whether or not to accept
         
         if OF_new - OF > 0:                    # Downhill move
             accept = True   
@@ -103,6 +117,7 @@ def optimize(input):
         # Reverse the change if the move is not accepted
         if accept:
             x = x_new
+            syms = syms_new
             OF = OF_new
         
         # Record data

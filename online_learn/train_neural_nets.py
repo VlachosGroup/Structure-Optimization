@@ -34,7 +34,8 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
     for x in structure_occs:
     
         cat.variable_occs = x
-        all_trans = cat.generate_all_translations()
+        #all_trans = cat.generate_all_translations()
+        all_trans = cat.generate_all_translations_and_rotations()
         if all_x is None:
             all_x = all_trans
         else:
@@ -46,20 +47,20 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
     Create Y
     '''
     
+    # Duplicate data for each rotation
+    site_rates_flat = site_rates.flatten()
+    y = np.tile(site_rates_flat,[3,1])
+    site_rates_flat = np.transpose(y).flatten()
+    
     X_reg = []
     Y_reg = []
     index = 0
-    for i in range(n_sims):
-        for j in range(n_sites):
+    for index in range(len(site_rates_flat)):
         
-            if site_rates[i,j] > 0. :               # possibly split this into zero and nonzero, since rates can be negative
+            if site_rates_flat[index] > 0.01 :               # possibly split this into zero and nonzero, since rates can be negative
                 X_reg.append( all_x[index,:] )
-                Y_reg.append( site_rates[i,j] )
-                
-            index += 1
-    
-    site_rates_flat = site_rates.flatten()
-    
+                Y_reg.append( site_rates_flat[index] )
+
     
     # Classify rates as zero or nonzero
     site_is_active = np.zeros(len(site_rates_flat))
@@ -96,7 +97,7 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
         print 'Fraction wrong in training set: ' + str(frac_wrong_train)
         
         good_enough = frac_wrong_train < 0.01        # Need classification to be at least 99% accurate
-	good_enough = True
+        good_enough = True
         attempts += 1
     
     '''
@@ -125,7 +126,7 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
         print 'Mean absolute error: ' + str(mae)
         
         good_enough = mae / np.mean(Y_reg) < 0.5       # error in quantitative predictions must be within 25% of the mean value
-	good_enough = True
+        good_enough = True
         attempts += 1
         
     
@@ -154,9 +155,10 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
     #plt.ylim([0, 0.50])
     #plt.legend(['train', 'test'], loc=4, prop={'size':20}, frameon=False)
     plt.tight_layout()
-    plt.savefig('Iteration_' + str(iter_num) + '_training_site_parity', dpi = 600)
+    plt.savefig('Iteration_' + str(iter_num) + '_training_site_parity_rot', dpi = 600)
     plt.close()
     
+    raise NameError('stop')
     
     '''
     See how the neural network predicts the overall activity of the structures in the training set
@@ -168,7 +170,9 @@ def train_neural_nets(structure_occs, site_propensities, iter_num = None):
     cat = NiPt_NH3_simple()
     struc_ind = 0
     for x in structure_occs:
-        structure_rates_NN[struc_ind] = eval_rate( cat, x, nn_class, nn_pred )
+        cat.variable_occs = x
+        syms = cat.generate_all_translations()
+        structure_rates_NN[struc_ind] = eval_rate( syms, nn_class, nn_pred )
         struc_ind += 1
     
     # Take x
