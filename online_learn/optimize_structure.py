@@ -5,30 +5,7 @@ import random
 import time
 import os
 
-
-
-'''
-Objective function
-'''
-
-def eval_rate(all_trans, nn_class, nn_pred, normalize_fac = 144):
-
-    
-    if all_trans is None:
-        cat.variable_occs = sigma
-        all_trans = cat.generate_all_translations()
-    sites_are_active = nn_class.predict(all_trans)
-    
-    active_site_list = []
-    for site_ind in range(len(sites_are_active)):
-        if sites_are_active[site_ind] == 1.:
-            active_site_list.append(site_ind)
-    
-    if active_site_list == []:
-        return 0
-    else:
-        return np.sum( nn_pred.predict( all_trans[active_site_list,:] ) ) / normalize_fac
-
+from train_surrogate import eval_rate
 
 
 def optimize(input):

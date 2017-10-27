@@ -3,26 +3,15 @@ import os
 
 import zacros_wrapper as zw
 from NH3.NiPt_NH3_simple import NiPt_NH3_simple
-
-
-
-
-def read_x(fldr_name):
-
-    '''
-    Read structure occupancies from a KMC folder
-    '''
-
-    cat = NiPt_NH3_simple()
-    cat.load_defects(os.path.join(fldr_name,'structure.xsd'))
-    return cat.variable_occs
     
     
-def read_y(fldr_name):
+def read_occs_and_rates(fldr_name, gas_prod = 'A'):
+
+    '''
+    Read structure occupancies and site propensities from a KMC folder
+    '''
+    
     print fldr_name
-    '''
-    Read site propensities from a KMC folder
-    '''
     
     x = zw.kmc_traj()
     x.Path = fldr_name
@@ -32,6 +21,23 @@ def read_y(fldr_name):
     cat = NiPt_NH3_simple()
     cat.load_defects(os.path.join(fldr_name,'structure.xsd'))
     site_props_ss = np.zeros( [cat.atoms_per_layer, n_rxns] )
+    
+    '''
+    Identify stoichiometries
+    '''
+    
+    # Find index of product molecule
+    try:
+        gas_prod_ind = len( x.simin.surf_spec ) + x.simin.gas_spec.index( gas_prod )           # Find the index of the product species and adjust index to account for surface species
+    except:
+        raise Exception('Gas species ' + gas_prod + ' not found.')
+
+    # Find the stochiometry of the product molecule for each reaction
+    nRxns = len(x.genout.RxnNameList)
+    TOF_stoich = np.zeros(nRxns)
+    for i, elem_stoich in enumerate(x.genout.Nu):
+        TOF_stoich[i] = elem_stoich[gas_prod_ind]
+    
     
     '''
     Fill in the rows of atoms that are present
@@ -62,20 +68,7 @@ def read_y(fldr_name):
             
         
         site_props_ss[defect_ind,:] = x.TS_site_props_ss[i,:]    
-         
     
-    '''
-    Check that the rate has been comptued correctly
-    '''
+    site_rates = np.matmul( site_props_ss, TOF_stoich )
     
-    # rate_specnum = - (x.specnumout.spec[-1,2] - x.specnumout.spec[0,2]) / ( x.specnumout.t[-1] - x.specnumout.t[0] )
-    # rate_props = ( ( x.propCounter[-1,0] - x.propCounter[-1,1] ) - ( x.propCounter[0,0] - x.propCounter[0,1])  ) / ( x.specnumout.t[-1] - x.specnumout.t[0] )
-    # rate_siteprops = np.sum( site_props_ss[:,0] - site_props_ss[:,1] )
-    # 
-    # print '\n'
-    # print fldr_name
-    # print 'From spec_num:\t' + str(rate_specnum)
-    # print 'From propensities:\t' + str(rate_props)
-    # print 'From site props:\t' + str(rate_siteprops)
-    
-    return site_props_ss
+    return [cat.variable_occs, site_rates]

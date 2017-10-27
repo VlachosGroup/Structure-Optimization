@@ -25,6 +25,10 @@ from generate_more_structures import *
 
 if __name__ == '__main__':
 
+    '''
+    User input
+    '''
+    
     initial_DB_size = 113
     gen_size = 16                    # 96 KMC simulations can run at one time
     start_iteration = 1
@@ -42,7 +46,7 @@ if __name__ == '__main__':
     if os.path.isfile('Iteration_0_X.npy'): 
     
         structure_occs = np.load('Iteration_0_X.npy')
-        site_propensities = np.load('Iteration_0_Y.npy')
+        site_rates = np.load('Iteration_0_Y.npy')
     
     # Read all KMC files
     else:
@@ -51,21 +55,20 @@ if __name__ == '__main__':
     
         # Run in parallel
         pool = Pool()
-        x_vec = pool.map(read_x, fldr_list)
+        kmc_data_list = pool.map(read_occs_and_rates, fldr_list)
         pool.close()
         
-        pool = Pool()
-        y_vec = pool.map(read_y, fldr_list)
-        pool.close()
+        structure_occs = []
+        site_rates = []    
+        for kmc_data in kmc_data_list:
+            structure_occs.append(kmc_data[0])
+            site_rates.append(kmc_data[1])
         
-        structure_occs = np.array(x_vec)
-        site_propensities = np.array(y_vec)
+        structure_occs = np.array(structure_occs)
+        site_rates = np.array(site_rates)
         
         np.save('Iteration_0_X.npy', structure_occs)
-        np.save('Iteration_0_Y.npy', site_propensities)
-    
-    structure_occs_new = None
-    site_propensities_new = None
+        np.save('Iteration_0_Y.npy', site_rates)
 
     
     # Initialize optimization with random structures
@@ -87,22 +90,42 @@ if __name__ == '__main__':
         os.chdir(data_fldr)
     
         '''
-        X and Y -> neural network objects
+        Update training data
         '''
         
-        # If this isn't the first iteration, add data from new structures
         if iteration > 0:
             structure_occs = np.vstack([structure_occs, structure_occs_new])
-            site_propensities = np.concatenate([site_propensities, site_propensities_new], axis = 0)
+            site_rates = np.concatenate([site_rates, site_rates_new], axis = 0)
         
-        nn_list = train_neural_nets(structure_occs, site_propensities, iter_num = iteration+1)
-        nn_class = nn_list[0]
-        nn_pred = nn_list[1]
-        structure_rates_KMC = nn_list[2]
-        structure_rates_NN = nn_list[3]
-
+        structure_rates_KMC = np.sum(site_rates, axis = 1)      # add site rates to get structure rates
+        
         '''
-        Optimize: neural network objects + initial structures -> optimized structures
+        Train the surrogate model
+        '''
+        
+        all_syms = generate_symmetries(structure_occs)      # Update all_syms at each iteration
+        parts = partition_data_set(all_syms, site_rates)
+        nn_class = train_classifier(all_syms, parts[0], pickle_name = 'Iteration_' + str(iteration) + 'classifier.p')
+        nn_pred = train_regressor(parts[1], parts[2], pickle_name = 'Iteration_' + str(iteration) + 'regressor.p')
+
+        
+        '''
+        Evaluate structures in the training set with the surrogate model
+        '''
+
+        n_training_strucs = len(structure_rates_KMC)
+        n_sites = site_rates.shape[1]
+        structure_rates_NN = np.zeros(n_training_strucs)
+        
+        for i in xrange(n_training_strucs):
+            syms = all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
+            structure_rates_NN[i] = eval_rate( syms, classifier, predictor )
+            
+        return structure_rates_NN
+        
+        
+        '''
+        Optimize structures using the surrogate model -> generate structures to add
         '''
         
         input_list = [ [ struc, nn_class, nn_pred ] for struc in structure_list ]
@@ -170,18 +193,19 @@ if __name__ == '__main__':
         y_vec = []
         
         for dir in rep.run_dirs:
-            x_vec.append( read_x(dir) )
-            y_vec.append( read_y(dir) )
+            kmc_data = read_occs_and_props(dir)
+            x_vec.append( kmc_data[0] )
+            y_vec.append( kmc_data[1] )
         
         structure_occs_new = np.array(x_vec)
-        site_propensities_new = np.array(y_vec)
+        site_rates_new = np.array(y_vec)
         
-        site_rates_new = site_propensities_new[:,:,0] - site_propensities_new[:,:,1]
+        site_rates_new = site_rates_new[:,:,0] - site_rates_new[:,:,1]
         structure_rates_KMC_new = np.sum(site_rates_new, axis = 1)
         
         
         np.save('Iteration_' + str(iteration+1) + 'opt_X.npy', structure_occs_new)
-        np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_propensities_new)
+        np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_rates_new)
         
         plt.figure()
         plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
