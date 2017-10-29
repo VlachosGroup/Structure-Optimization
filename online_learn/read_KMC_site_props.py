@@ -4,8 +4,27 @@ import os
 import zacros_wrapper as zw
 from NH3.NiPt_NH3_simple import NiPt_NH3_simple
     
+from multiprocessing import Pool
     
-def read_occs_and_rates(fldr_name, gas_prod = 'A'):
+def read_many_calcs(fldr_list):
+
+    # Run in parallel
+    pool = Pool()
+    kmc_data_list = pool.map(read_occs_and_rates, fldr_list)
+    pool.close()
+    
+    structure_occs = []
+    site_rates = []    
+    for kmc_data in kmc_data_list:
+        structure_occs.append(kmc_data[0])
+        site_rates.append(kmc_data[1])
+    
+    structure_occs = np.array(structure_occs)
+    site_rates = np.array(site_rates)
+
+    return [ structure_occs , site_rates ]
+    
+def read_occs_and_rates(fldr_name, gas_prod = 'A', gas_stoich = -1):
 
     '''
     Read structure occupancies and site propensities from a KMC folder
@@ -69,6 +88,6 @@ def read_occs_and_rates(fldr_name, gas_prod = 'A'):
         
         site_props_ss[defect_ind,:] = x.TS_site_props_ss[i,:]    
     
-    site_rates = np.matmul( site_props_ss, TOF_stoich )
+    site_rates = np.matmul( site_props_ss, TOF_stoich ) / gas_stoich
     
     return [cat.variable_occs, site_rates]

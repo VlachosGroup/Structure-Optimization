@@ -236,28 +236,32 @@ class NiPt_NH3_simple(dynamic_cat):
         
         
         # 5. Ni edge
+        # Has two adjacent vacancies as neighbors. The other 4 neighbors must be Ni.
         mini_graph = nx.Graph() 
         mini_graph.add_nodes_from(['A', 'B', 'C'])
         mini_graph.add_edges_from([['A','B'], ['B','C'], ['C','A']])
         mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'Ni'
+        mini_graph.node['B']['element'] = 'vacancy'
         mini_graph.node['C']['element'] = 'vacancy'
         GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             A_ind = inv_map['A']
-            B_ind = inv_map['B']
-            self.defected_graph.node[A_ind]['site_type'] = 5
-            self.defected_graph.node[B_ind]['site_type'] = 5
+            n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
+            for neighb in self.defected_graph.neighbors(A_ind):               # look though the neighbors of the Ni atom (1)
+                if self.defected_graph.node[neighb]['site_type'] == 3 or self.defected_graph.node[neighb]['site_type'] == 4 or self.defected_graph.node[neighb]['site_type'] == 5:
+                    n_Ni_neighbs += 1
+            if n_Ni_neighbs == 4:
+                self.defected_graph.node[i]['site_type'] = 5
         
         # 4. Ni corner
         for i in range(n_at):
-            if self.defected_graph.node[i]['site_type'] == 5 or self.defected_graph.node[i]['site_type'] == 3:     
+            if self.defected_graph.node[i]['site_type'] == 3:     
                 n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
                 for neighb in self.defected_graph.neighbors(i):               # look though the neighbors of the Ni fcc sites (1)
                     if self.defected_graph.node[neighb]['site_type'] == 3 or self.defected_graph.node[neighb]['site_type'] == 4 or self.defected_graph.node[neighb]['site_type'] == 5:
                         n_Ni_neighbs += 1
-                if n_Ni_neighbs <= 3:
+                if n_Ni_neighbs < 6:
                     self.defected_graph.node[i]['site_type'] = 4
 
         

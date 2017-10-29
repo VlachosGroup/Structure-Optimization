@@ -19,9 +19,9 @@ import matplotlib.pyplot as plt
 
 # functions
 from read_KMC_site_props import *
-from train_neural_nets import *
-from optimize_structure import *
-from generate_more_structures import *
+from train_surrogate import surrogate
+from optimize_SA import *
+from build_KMC_input import *
 
 if __name__ == '__main__':
 
@@ -34,16 +34,19 @@ if __name__ == '__main__':
     start_iteration = 1
     end_iteration = 10
     data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data'
-    DB_fldr = './KMC_DB'        # relative to data_fldr
+    DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data/KMC_DB'
+    #data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/OML_data'
+    #DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/KMC_DB'
+    
+    
+    '''
+    Read KMC data from database
+    '''
     
     os.chdir(data_fldr)
     
-    '''
-    Read KMC data -> build X and Y
-    '''
-    
     # Read from existing pickle file
-    if os.path.isfile('Iteration_0_X.npy'): 
+    if False:#os.path.isfile('Iteration_0_X.npy'): 
     
         structure_occs = np.load('Iteration_0_X.npy')
         site_rates = np.load('Iteration_0_Y.npy')
@@ -53,23 +56,21 @@ if __name__ == '__main__':
     
         fldr_list = [os.path.join(DB_fldr, 'structure_' + str(i+1) ) for i in xrange(initial_DB_size)]
     
-        # Run in parallel
-        pool = Pool()
-        kmc_data_list = pool.map(read_occs_and_rates, fldr_list)
-        pool.close()
+        # Read folders in parallel
+        output = read_many_calcs(fldr_list)
+        structure_occs = output[0]
+        site_rates = output[1]
         
-        structure_occs = []
-        site_rates = []    
-        for kmc_data in kmc_data_list:
-            structure_occs.append(kmc_data[0])
-            site_rates.append(kmc_data[1])
-        
-        structure_occs = np.array(structure_occs)
-        site_rates = np.array(site_rates)
-        
-        np.save('Iteration_0_X.npy', structure_occs)
-        np.save('Iteration_0_Y.npy', site_rates)
+        #np.save('Iteration_0_X.npy', structure_occs)
+        #np.save('Iteration_0_Y.npy', site_rates)
 
+    structure_occs_new = structure_occs
+    
+    '''
+    Initialize new structures
+    '''
+    
+    surr = surrogate()
     
     # Initialize optimization with random structures
     structure_list = [NiPt_NH3_simple() for i in xrange(gen_size)]
@@ -103,10 +104,10 @@ if __name__ == '__main__':
         Train the surrogate model
         '''
         
-        all_syms = generate_symmetries(structure_occs)      # Update all_syms at each iteration
-        parts = partition_data_set(all_syms, site_rates)
-        nn_class = train_classifier(all_syms, parts[0], pickle_name = 'Iteration_' + str(iteration) + 'classifier.p')
-        nn_pred = train_regressor(parts[1], parts[2], pickle_name = 'Iteration_' + str(iteration) + 'regressor.p')
+        surr.generate_symmetries(structure_occs_new)      # Add symmetries to the list in the surrogate model
+        surr.partition_data_set(site_rates)
+        surr.train_classifier()
+        surr.train_regressor()
 
         
         '''
@@ -119,19 +120,16 @@ if __name__ == '__main__':
         
         for i in xrange(n_training_strucs):
             syms = all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
-            structure_rates_NN[i] = eval_rate( syms, classifier, predictor )
-            
-        return structure_rates_NN
+            structure_rates_NN[i] = surr.eval_rate( syms )
         
         
         '''
         Optimize structures using the surrogate model -> generate structures to add
         '''
         
-        input_list = [ [ struc, nn_class, nn_pred ] for struc in structure_list ]
+        input_list = [ [ struc, surr ] for struc in structure_list ]
         
         pool = Pool()
-        #trajectory_list = pool.map(optimize, input_list)
         outputs = pool.map(optimize, input_list)
         pool.close()
         
@@ -142,16 +140,6 @@ if __name__ == '__main__':
             traj = outputs[i][1]
             trajectory_list.append(traj)
             predicted_activities.append(traj[1][-1])
-            
-        
-        
-        # Serial version
-        #trajectory_list = []
-        #predicted_activities = []
-        #for struc in structure_list:
-        #    trajectory = optimize(struc, nn_class, nn_pred)
-        #    trajectory_list.append(np.array(trajectory))
-        #    predicted_activities.append(trajectory[1][-1])
         
         predicted_activities = np.array(predicted_activities)
         
@@ -189,23 +177,25 @@ if __name__ == '__main__':
         '''
     
         
-        x_vec = []
-        y_vec = []
-        
-        for dir in rep.run_dirs:
-            kmc_data = read_occs_and_props(dir)
-            x_vec.append( kmc_data[0] )
-            y_vec.append( kmc_data[1] )
-        
-        structure_occs_new = np.array(x_vec)
-        site_rates_new = np.array(y_vec)
-        
-        site_rates_new = site_rates_new[:,:,0] - site_rates_new[:,:,1]
-        structure_rates_KMC_new = np.sum(site_rates_new, axis = 1)
-        
+        # Read folders in parallel
+        output = read_many_calcs(rep.run_dirs)
+        structure_occs_new = output[0]
+        site_rates_new = output[1]
         
         np.save('Iteration_' + str(iteration+1) + 'opt_X.npy', structure_occs_new)
         np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_rates_new)
+        
+        structure_rates_KMC_new = np.sum(site_rates_new, axis = 1)      # add site rates to get structure rates
+        
+        '''
+        Plot surrogate parity 
+        '''
+        
+        # Save parity plot data for later analysis
+        np.save('Iteration_' + str(iteration+1) + '_structure_rates_KMC.npy', structure_rates_KMC)
+        np.save('Iteration_' + str(iteration+1) + '_structure_rates_NN.npy', structure_rates_NN)
+        np.save('Iteration_' + str(iteration+1) + '_structure_rates_KMC_new.npy', structure_rates_KMC_new)
+        np.save('Iteration_' + str(iteration+1) + '_predicted_activities.npy', predicted_activities)
         
         plt.figure()
         plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
@@ -217,11 +207,11 @@ if __name__ == '__main__':
         
         plt.xticks(size=18)
         plt.yticks(size=18)
-        plt.xlabel('Kinetic Monte Carlo', size=24)
-        plt.ylabel('Neural network', size=24)
+        plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
+        plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
         #plt.xlim([0, 0.50])
         #plt.ylim([0, 0.50])
-        plt.legend(['train', 'optima'], loc=4, prop={'size':20}, frameon=False)
+        plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
         plt.tight_layout()
         plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
         plt.close()

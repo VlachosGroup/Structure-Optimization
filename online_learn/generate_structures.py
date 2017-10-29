@@ -87,7 +87,7 @@ if __name__ == '__main__':
     
     # Run in parallel
     pool = Pool()
-    y_vec = pool.map(square, range(96))        # change 1 to 96
+    y_vec = pool.map(square, range(0,96))        # change 1 to 96
     pool.close()
     
     np.save('X.npy', np.array(y_vec))

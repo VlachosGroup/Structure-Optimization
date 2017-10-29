@@ -5,8 +5,6 @@ import random
 import time
 import os
 
-from train_surrogate import eval_rate
-
 
 def optimize(input):
     
@@ -19,8 +17,7 @@ def optimize(input):
     '''
     
     cat = input[0]
-    nn_class = input[1]
-    nn_pred = input[2]
+    surrogate = input[1]
     
     total_steps = 100 * len( cat.variable_occs )
     #total_steps = 100          # for debugging
@@ -40,7 +37,7 @@ def optimize(input):
     # Evaluate initial structure
     x = cat.variable_occs
     syms = cat.generate_all_translations()
-    OF = eval_rate(syms, nn_class, nn_pred, normalize_fac = 1)
+    OF = surrogate.eval_rate(syms, normalize_fac = 1)
     
     # Record data
     step_rec[record_ind] = 0
@@ -81,7 +78,7 @@ def optimize(input):
         End random move
         '''
         
-        OF_new = eval_rate(syms_new, nn_class, nn_pred, normalize_fac = 1)           # Evaluate the new structure and determine whether or not to accept
+        OF_new = surrogate.eval_rate(syms_new, normalize_fac = 1)   # Evaluate the new structure and determine whether or not to accept
         
         if OF_new - OF > 0:                    # Downhill move
             accept = True   
