@@ -32,7 +32,7 @@ class surrogate(object):
         self.Y_scaler = None
         
     
-    def eval_rate(all_trans, normalize_fac = 144):
+    def eval_rate(self, all_trans, normalize_fac = 144):
     
         '''
         Surrogate model using a classifier and regressor
@@ -84,7 +84,7 @@ class surrogate(object):
         y = np.tile(site_rates_flat,[3,1])
         site_rates_flat = np.transpose(y).flatten()
         y_max = np.max(site_rates_flat)
-        active_cut = 0.000
+        active_cut = 0.005
         
         print site_rates_flat.shape
         
@@ -173,5 +173,3 @@ class surrogate(object):
         plt.tight_layout()
         plt.savefig('Iteration_' + str(0) + '_training_site_parity_rot', dpi = 600)
         plt.close()
-        
-        raise NameError('stop')

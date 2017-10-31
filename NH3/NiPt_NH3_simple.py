@@ -204,34 +204,24 @@ class NiPt_NH3_simple(dynamic_cat):
         Add site types one by one
         '''
         
-        # 1. Ni_fcc
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'Ni'
-        mini_graph.node['C']['element'] = 'Ni'
-        mini_graph.node['D']['element'] = 'vacuum'
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 1
+        # 4. Ni corner
+        for i in range(n_at):
+            if self.defected_graph.node[i]['element'] == 'Ni':   # Ni atoms not defined as sites  
+                self.defected_graph.node[i]['site_type'] = 2
         
-        # 2. Ni_hcp
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'Ni'
-        mini_graph.node['C']['element'] = 'Ni'
-        mini_graph.node['D']['element'] = 'Pt'
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 2
         
         # 3. Ni_top
         for i in range(n_at):
             if self.defected_graph.node[i]['element'] == 'Ni':
-                self.defected_graph.node[i]['site_type'] = 3
+                
+                # count the number of neighbors that are Ni edge sites
+                n_Ni_neighbs = 0                 
+                for neighb in self.defected_graph.neighbors(i):               # look though the neighbors of the Ni fcc sites (1)
+                    if self.defected_graph.node[neighb]['element'] == 'Ni':
+                        n_Ni_neighbs += 1
+                        
+                if n_Ni_neighbs == 6:
+                    self.defected_graph.node[i]['site_type'] = 1
         
         
         
@@ -247,167 +237,19 @@ class NiPt_NH3_simple(dynamic_cat):
         for subgraph in GM.subgraph_isomorphisms_iter():
             inv_map = {v: k for k, v in subgraph.items()}
             A_ind = inv_map['A']
-            n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
-            for neighb in self.defected_graph.neighbors(A_ind):               # look though the neighbors of the Ni atom (1)
-                if self.defected_graph.node[neighb]['site_type'] == 3 or self.defected_graph.node[neighb]['site_type'] == 4 or self.defected_graph.node[neighb]['site_type'] == 5:
-                    n_Ni_neighbs += 1
-            if n_Ni_neighbs == 4:
-                self.defected_graph.node[i]['site_type'] = 5
-        
-        # 4. Ni corner
-        for i in range(n_at):
-            if self.defected_graph.node[i]['site_type'] == 3:     
-                n_Ni_neighbs = 0                 # count the number of neighbors that are Ni edge sites
-                for neighb in self.defected_graph.neighbors(i):               # look though the neighbors of the Ni fcc sites (1)
-                    if self.defected_graph.node[neighb]['site_type'] == 3 or self.defected_graph.node[neighb]['site_type'] == 4 or self.defected_graph.node[neighb]['site_type'] == 5:
-                        n_Ni_neighbs += 1
-                if n_Ni_neighbs < 6:
-                    self.defected_graph.node[i]['site_type'] = 4
-
-        
-        # 6. Pt_fcc
-        for i in range(n_at):
-            if self.defected_graph.node[i]['element'] == 'vacancy':
-                self.defected_graph.node[i]['site_type'] = 6
-        
-        # 8. Pt_top
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['element'] = 'vacancy'
-        mini_graph.node['B']['element'] = 'vacancy'
-        mini_graph.node['C']['element'] = 'vacancy'
-        mini_graph.node['D']['element'] = 'Pt'
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 8
-        
-        # 7. Pt_hcp 
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['site_type'] = 8
-        mini_graph.node['B']['site_type'] = 8
-        mini_graph.node['C']['site_type'] = 8
-        mini_graph.node['D']['site_type'] = None
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 7
-        
-        
-        
-        # 12. h4
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'vacancy'
-        mini_graph.node['C']['element'] = 'vacancy'
-        mini_graph.node['D']['element'] = 'vacuum'
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            B_ind = inv_map['B']
-            C_ind = inv_map['C']
-            D_ind = inv_map['D']
-            self.defected_graph.node[B_ind]['site_type'] = 10
-            self.defected_graph.node[C_ind]['site_type'] = 10
-            self.defected_graph.node[D_ind]['site_type'] = 12
-        
-        
-        
-        # 14. s2 and 11. f4
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'Ni'
-        mini_graph.node['C']['element'] = 'vacancy'
-        mini_graph.node['D']['element'] = 'vacuum'
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            C_ind = inv_map['C']
-            D_ind = inv_map['D']
-            self.defected_graph.node[C_ind]['site_type'] = 11
-            self.defected_graph.node[D_ind]['site_type'] = 14
             
-        # 15. s1 and 10. f3
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['element'] = 'Ni'
-        mini_graph.node['B']['element'] = 'Ni'
-        mini_graph.node['C']['element'] = 'vacancy'
-        mini_graph.node['D']['element'] = 'Pt'
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('element', 'Ni'))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 15
-        
-        # 16. f1 and 17. f2
-        for i in range(n_at):
-            if self.defected_graph.node[i]['site_type'] == 1:     # look though the neighbors of the Ni fcc sites (1)
-                n_edges = 0                 # count the number of neighbors that are Ni edge sites
-                for neighb in self.defected_graph.neighbors(i):
-                    if self.defected_graph.node[neighb]['site_type'] == 5 or self.defected_graph.node[neighb]['site_type'] == 4:
-                        n_edges += 1
-                if n_edges == 1:
-                    self.defected_graph.node[i]['site_type'] = 17
-                elif n_edges >= 2:
-                    self.defected_graph.node[i]['site_type'] = 16
+            # count the number of neighbors that are Ni edge sites
+            n_Ni_neighbs = 0                 
+            for neighb in self.defected_graph.neighbors(A_ind):               # look though the neighbors of the Ni atom (1)
+                if self.defected_graph.node[neighb]['element'] == 'Ni':
+                    n_Ni_neighbs += 1
+                    
+            if n_Ni_neighbs == 4:
+                self.defected_graph.node[A_ind]['site_type'] = 3
         
         
-        # 18. h1
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['site_type'] = 3
-        mini_graph.node['B']['site_type'] = 3
-        mini_graph.node['C']['site_type'] = 5
-        mini_graph.node['D']['site_type'] = 2
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 18
-        
-        # 19. h2
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['site_type'] = 3
-        mini_graph.node['B']['site_type'] = 5
-        mini_graph.node['C']['site_type'] = 5
-        mini_graph.node['D']['site_type'] = 2
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            D_ind = inv_map['D']
-            self.defected_graph.node[D_ind]['site_type'] = 19
-        
-        
-        # 9. h5
-        for i in range(n_at):
-            if self.defected_graph.node[i]['site_type'] == 6:
-                i_pos = self.atoms_template.get_positions()[i,0:2:]
-                s1_in_range = False
-                
-                for j in range(n_at):
-                    if self.defected_graph.node[j]['site_type'] == 15:
-                        j_pos = self.atoms_template.get_positions()[j,0:2:]
-
-                        if np.linalg.norm( i_pos - j_pos ) < 2.77 * 2:
-                            s1_in_range = True
-                
-                if s1_in_range:
-                    self.defected_graph.node[i]['site_type'] = 9
 
         
-        # 13. h6
-        mini_graph = copy.deepcopy(tet_graph)
-        mini_graph.node['A']['site_type'] = 8
-        mini_graph.node['B']['site_type'] = 8
-        mini_graph.node['C']['site_type'] = None
-        mini_graph.node['D']['site_type'] = None
-        GM = iso.GraphMatcher(self.defected_graph, mini_graph, node_match=iso.categorical_node_match('site_type', 8))
-        for subgraph in GM.subgraph_isomorphisms_iter():
-            inv_map = {v: k for k, v in subgraph.items()}
-            A_ind = inv_map['A']
-            D_ind = inv_map['D']
-            if self.atoms_template.get_positions()[D_ind,2] - self.atoms_template.get_positions()[A_ind,2] < -0.1: # lower layer than top Pt
-                self.defected_graph.node[D_ind]['site_type'] = 13
             
             
         '''
@@ -434,8 +276,8 @@ class NiPt_NH3_simple(dynamic_cat):
         cart_coords_list = []
         for i in range(n_at):
             #if not self.defected_graph.node[i]['site_type'] is None:
-            if self.defected_graph.node[i]['site_type'] in [3,4,5]:
-                self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'] - 2)
+            if self.defected_graph.node[i]['site_type'] in [1,2,3]:
+                self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'])
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
         
         self.KMC_lat.set_cart_coords(cart_coords_list)

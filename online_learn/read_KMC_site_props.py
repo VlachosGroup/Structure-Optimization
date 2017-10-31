@@ -78,6 +78,7 @@ def read_occs_and_rates(fldr_name, gas_prod = 'A', gas_stoich = -1):
             defect_ind += 1
             
             if defect_ind >= len(cat.variable_atoms):
+                print lat_site_coords
                 raise NameError('Molecular site not found for lattice site.')
         
             atom_ind = cat.variable_atoms[defect_ind]

@@ -29,9 +29,10 @@ def build_KMC_input(cat, fldr_name, trajectory = None):
     cat.show(fname = os.path.join(fldr_name,'structure'), fmat = 'xsd', chop_top = False)
     
     # Move non-lattice KMC input files to the folder
-    os.system('cp KMC_input/simulation_input.dat ' + fldr_name)
-    os.system('cp KMC_input/mechanism_input.dat ' + fldr_name)
-    os.system('cp KMC_input/energetics_input.dat ' + fldr_name)
+    kmc_src = '/home/vlachos/mpnunez/NN_data/AB_data/KMC_input'
+    os.system('cp ' + os.path.join(kmc_src, 'simulation_input.dat') + ' ' + fldr_name)
+    os.system('cp ' + os.path.join(kmc_src, 'mechanism_input.dat') + ' ' + fldr_name)
+    os.system('cp ' + os.path.join(kmc_src, 'energetics_input.dat') + ' ' + fldr_name)
     
     # Generate lattice input file
     cat.graph_to_KMClattice()

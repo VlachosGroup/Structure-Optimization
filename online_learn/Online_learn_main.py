@@ -33,10 +33,10 @@ if __name__ == '__main__':
     gen_size = 16                    # 96 KMC simulations can run at one time
     start_iteration = 1
     end_iteration = 10
-    data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data'
-    DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data/KMC_DB'
-    #data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/OML_data'
-    #DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/KMC_DB'
+    #data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data'
+    #DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data/KMC_DB'
+    data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/OML_data'
+    DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/KMC_DB'
     
     
     '''
@@ -98,7 +98,7 @@ if __name__ == '__main__':
             structure_occs = np.vstack([structure_occs, structure_occs_new])
             site_rates = np.concatenate([site_rates, site_rates_new], axis = 0)
         
-        structure_rates_KMC = np.sum(site_rates, axis = 1)      # add site rates to get structure rates
+        structure_rates_KMC = np.sum(site_rates, axis = 1) / 144.0      # add site rates to get structure rates
         
         '''
         Train the surrogate model
@@ -119,7 +119,7 @@ if __name__ == '__main__':
         structure_rates_NN = np.zeros(n_training_strucs)
         
         for i in xrange(n_training_strucs):
-            syms = all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
+            syms = surr.all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
             structure_rates_NN[i] = surr.eval_rate( syms )
         
         
@@ -141,7 +141,7 @@ if __name__ == '__main__':
             trajectory_list.append(traj)
             predicted_activities.append(traj[1][-1])
         
-        predicted_activities = np.array(predicted_activities)
+        predicted_activities = np.array(predicted_activities) / 144.0
         
         '''
         Optimized structures -> KMC input files
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         np.save('Iteration_' + str(iteration+1) + 'opt_X.npy', structure_occs_new)
         np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_rates_new)
         
-        structure_rates_KMC_new = np.sum(site_rates_new, axis = 1)      # add site rates to get structure rates
+        structure_rates_KMC_new = np.sum(site_rates_new, axis = 1) / 144.0      # add site rates to get structure rates
         
         '''
         Plot surrogate parity 
@@ -199,7 +199,7 @@ if __name__ == '__main__':
         
         plt.figure()
         plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
-        plt.plot(structure_rates_KMC_new, predicted_activities, '^')
+        plt.plot(structure_rates_KMC_new, predicted_activities, 's')
         all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new, predicted_activities])
         par_min = min( all_point_values )
         par_max = max( all_point_values )
