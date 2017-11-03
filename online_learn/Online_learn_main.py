@@ -29,15 +29,13 @@ if __name__ == '__main__':
     User input
     '''
     
-    initial_DB_size = 113
+    initial_DB_size = 50
     gen_size = 16                    # 96 KMC simulations can run at one time
     start_iteration = 1
     end_iteration = 10
-    #data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data'
-    #DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data/KMC_DB'
-    data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/OML_data'
-    DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_2/KMC_DB'
-    
+    data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_4/OML_data'
+    DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_4/KMC_DB'
+    kmc_src = '/home/vlachos/mpnunez/NN_data/AB_data_4/KMC_input'
     
     '''
     Read KMC data from database
@@ -151,7 +149,7 @@ if __name__ == '__main__':
         
         for new_calc_ind in xrange(gen_size):
             build_KMC_input(structure_list[new_calc_ind], os.path.join(DB_fldr, 'structure_' + str(n_fldrs + new_calc_ind + 1) ),
-                    trajectory = trajectory_list[new_calc_ind])
+                    kmc_src, trajectory = trajectory_list[new_calc_ind])
 
         '''
         Run KMC simulations

@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib as mat
 import matplotlib.pyplot as plt
 
-def build_KMC_input(cat, fldr_name, trajectory = None):
+def build_KMC_input(cat, fldr_name, kmc_src, trajectory = None):
 
     '''
     Generate KMC input files for a new structure
@@ -29,7 +29,6 @@ def build_KMC_input(cat, fldr_name, trajectory = None):
     cat.show(fname = os.path.join(fldr_name,'structure'), fmat = 'xsd', chop_top = False)
     
     # Move non-lattice KMC input files to the folder
-    kmc_src = '/home/vlachos/mpnunez/NN_data/AB_data/KMC_input'
     os.system('cp ' + os.path.join(kmc_src, 'simulation_input.dat') + ' ' + fldr_name)
     os.system('cp ' + os.path.join(kmc_src, 'mechanism_input.dat') + ' ' + fldr_name)
     os.system('cp ' + os.path.join(kmc_src, 'energetics_input.dat') + ' ' + fldr_name)

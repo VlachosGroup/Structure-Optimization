@@ -24,7 +24,7 @@ def optimize(input):
     
     #initial_T = 0.6
     initial_T = 0
-    c = 0.5
+    c = 0.05        # c = 0.5 for AB_data_3
     
     # Trajectory recording parameters
     n_record = 100
