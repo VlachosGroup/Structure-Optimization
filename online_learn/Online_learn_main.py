@@ -11,6 +11,7 @@ sys.path.append('/home/vlachos/mpnunez/python_packages/sklearn/lib/python2.7/sit
 import pickle
 
 from multiprocessing import Pool
+from NH3.NiPt_NH3 import NiPt_NH3
 from NH3.NiPt_NH3_simple import NiPt_NH3_simple
 import zacros_wrapper as zw
 
@@ -33,16 +34,19 @@ if __name__ == '__main__':
     gen_size = 16                    # 96 KMC simulations can run at one time
     start_iteration = 1
     end_iteration = 10
-    data_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_4/OML_data'
-    DB_fldr = '/home/vlachos/mpnunez/NN_data/AB_data_4/KMC_DB'
-    kmc_src = '/home/vlachos/mpnunez/NN_data/AB_data_4/KMC_input'
+    data_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/OML_data'
+    DB_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_DB'
+    kmc_src = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_input'
+    
+    sys.setrecursionlimit(1500)             # Needed for large number of atoms
+    cat = NiPt_NH3()
     
     '''
     Read KMC data from database
     '''
     
     os.chdir(data_fldr)
-    
+
     # Read from existing pickle file
     if False:#os.path.isfile('Iteration_0_X.npy'): 
     
@@ -71,7 +75,7 @@ if __name__ == '__main__':
     surr = surrogate()
     
     # Initialize optimization with random structures
-    structure_list = [NiPt_NH3_simple() for i in xrange(gen_size)]
+    structure_list = [NiPt_NH3() for i in xrange(gen_size)]
     intial_struc_inds = random.sample(range(initial_DB_size), gen_size)     # choose some of training structures as initial structures
     
     for i in range(gen_size):
@@ -96,13 +100,13 @@ if __name__ == '__main__':
             structure_occs = np.vstack([structure_occs, structure_occs_new])
             site_rates = np.concatenate([site_rates, site_rates_new], axis = 0)
         
-        structure_rates_KMC = np.sum(site_rates, axis = 1) / 144.0      # add site rates to get structure rates
+        structure_rates_KMC = np.sum(site_rates, axis = 1) / cat.atoms_per_layer      # add site rates to get structure rates
         
         '''
         Train the surrogate model
         '''
         
-        surr.generate_symmetries(structure_occs_new)      # Add symmetries to the list in the surrogate model
+        surr.generate_symmetries(structure_occs_new, cat)      # Add symmetries to the list in the surrogate model
         surr.partition_data_set(site_rates)
         surr.train_classifier()
         surr.train_regressor()
@@ -118,7 +122,26 @@ if __name__ == '__main__':
         
         for i in xrange(n_training_strucs):
             syms = surr.all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
-            structure_rates_NN[i] = surr.eval_rate( syms )
+            structure_rates_NN[i] = surr.eval_rate( syms ) / cat.atoms_per_layer
+        
+        
+        plt.figure()
+        plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
+        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN ])
+        par_min = min( all_point_values )
+        par_max = max( all_point_values )
+        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
+        
+        plt.xticks(size=18)
+        plt.yticks(size=18)
+        plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
+        plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
+        #plt.xlim([0, 0.50])
+        #plt.ylim([0, 0.50])
+        plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
+        plt.tight_layout()
+        plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
+        plt.close()
         
         
         '''
@@ -139,7 +162,7 @@ if __name__ == '__main__':
             trajectory_list.append(traj)
             predicted_activities.append(traj[1][-1])
         
-        predicted_activities = np.array(predicted_activities) / 144.0
+        predicted_activities = np.array(predicted_activities) / cat.atoms_per_layer
         
         '''
         Optimized structures -> KMC input files
@@ -183,7 +206,7 @@ if __name__ == '__main__':
         np.save('Iteration_' + str(iteration+1) + 'opt_X.npy', structure_occs_new)
         np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_rates_new)
         
-        structure_rates_KMC_new = np.sum(site_rates_new, axis = 1) / 144.0      # add site rates to get structure rates
+        structure_rates_KMC_new = np.sum(site_rates_new, axis = 1) / cat.atoms_per_layer      # add site rates to get structure rates
         
         '''
         Plot surrogate parity 

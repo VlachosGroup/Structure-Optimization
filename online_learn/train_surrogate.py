@@ -32,7 +32,7 @@ class surrogate(object):
         self.Y_scaler = None
         
     
-    def eval_rate(self, all_trans, normalize_fac = 144):
+    def eval_rate(self, all_trans, normalize_fac = 1):
     
         '''
         Surrogate model using a classifier and regressor
@@ -52,17 +52,13 @@ class surrogate(object):
             return np.sum( site_rates ) / normalize_fac
     
     
-    def generate_symmetries(self,structure_occs):
+    def generate_symmetries(self,structure_occs, cat):
     
         '''
         :param structure_occs:   Occupancy vectors for each structure
         :param site_propensities:   Site propensities for each structure
         '''
     
-        cat = NiPt_NH3_simple()
-        
-        
-        
         for x in structure_occs:            # Can we parallelize this?
         
             cat.variable_occs = x

@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 import zacros_wrapper as zw
-from NH3.NiPt_NH3_simple import NiPt_NH3_simple
+from NH3.NiPt_NH3 import NiPt_NH3
     
 from multiprocessing import Pool
     
@@ -24,7 +24,7 @@ def read_many_calcs(fldr_list):
 
     return [ structure_occs , site_rates ]
     
-def read_occs_and_rates(fldr_name, gas_prod = 'A', gas_stoich = -1):
+def read_occs_and_rates(fldr_name, gas_prod = 'N2', gas_stoich = 1):
 
     '''
     Read structure occupancies and site propensities from a KMC folder
@@ -37,7 +37,7 @@ def read_occs_and_rates(fldr_name, gas_prod = 'A', gas_stoich = -1):
     x.ReadAllOutput(build_lattice=True)
     
     n_rxns = len( x.genout.RxnNameList )
-    cat = NiPt_NH3_simple()
+    cat = NiPt_NH3()
     cat.load_defects(os.path.join(fldr_name,'structure.xsd'))
     site_props_ss = np.zeros( [cat.atoms_per_layer, n_rxns] )
     
@@ -73,21 +73,21 @@ def read_occs_and_rates(fldr_name, gas_prod = 'A', gas_stoich = -1):
         
         
         defect_ind = -1
-        while not match_found:
+        while ( not match_found ) and ( defect_ind < len(cat.variable_atoms)-1 ):
             
             defect_ind += 1
             
-            if defect_ind >= len(cat.variable_atoms):
-                print lat_site_coords
-                raise NameError('Molecular site not found for lattice site.')
+            #if defect_ind >= len(cat.variable_atoms):          # Comment this out to only look for matches for top sites
+            #    print lat_site_coords
+            #    raise NameError('Molecular site not found for lattice site.')
         
             atom_ind = cat.variable_atoms[defect_ind]
             atom_pos = mol_cart_coords[atom_ind,:]
             
             match_found = ( np.linalg.norm( atom_pos - lat_site_coords ) < d_cut )
             
-        
-        site_props_ss[defect_ind,:] = x.TS_site_props_ss[i,:]    
+        if match_found:
+            site_props_ss[defect_ind,:] = x.TS_site_props_ss[i,:]    
     
     site_rates = np.matmul( site_props_ss, TOF_stoich ) / gas_stoich
     
