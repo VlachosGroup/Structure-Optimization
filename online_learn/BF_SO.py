@@ -1,3 +1,7 @@
+'''
+Optimization with genetic algorithm (currently not used)
+'''
+
 import sys
 sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization/ORR/')
 sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')

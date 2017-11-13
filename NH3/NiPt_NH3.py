@@ -6,7 +6,7 @@ from ase.neighborlist import NeighborList
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
-from cat_optimization.dynamic_cat import dynamic_cat
+from dynamic_cat import dynamic_cat
 from zacros_wrapper.Lattice import Lattice as lat
 
 

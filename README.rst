@@ -1,10 +1,7 @@
 Catalyst Structure Optimization
 ================================
 
-Catalyst structure optimization in Python. It is applied to 
-
-* NH3 decomposition on NiPt
-* Oxygen reduction reaction on Pt and Au
+Catalyst structure optimization using kinetic Monte Carlo and machine learning. It is applied to NH3 decomposition on NiPt.
 
 Dependencies
 -------------
@@ -16,7 +13,6 @@ Dependencies
 
 Publications
 -------------
-* M. Nunez, J. Lansford, D.G. Vlachos, "Optimization of transition metal catalyst facet structure: Application to the oxygen reduction reaction" (under revision)
 * M. Nunez and D.G. Vlachos, "Catalyst Structure Optimization using Data Driven Model Reduction" (in preparation)
 
 Developers
