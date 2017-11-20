@@ -13,7 +13,7 @@ Dependencies
 
 Publications
 -------------
-* M. Nunez and D.G. Vlachos, "Catalyst Structure Optimization using Data Driven Model Reduction" (in preparation)
+* M. Nunez and D.G. Vlachos, "An Online Machine Learning Approach to Optimizing Active Site Coupling" (in preparation)
 
 Developers
 -----------

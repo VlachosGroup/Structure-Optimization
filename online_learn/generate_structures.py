@@ -7,17 +7,16 @@ sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
 sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization')
 sys.path.append('/home/vlachos/mpnunez/python_packages/ase')
 sys.path.append('/home/vlachos/mpnunez/python_packages/sklearn/lib/python2.7/site-packages')
+
 import os
-
 import numpy as np
-
-from cat_optimization import *
-from NH3.NiPt_NH3 import NiPt_NH3
-from build_KMC_input import *
 
 import random
 import time
 from multiprocessing import Pool
+
+from NH3.NiPt_NH3 import NiPt_NH3
+from KMC_handler import *
 
 '''
 Generate data set
@@ -32,8 +31,8 @@ def square(i):
     n_strucs = 50
     
     cat = NiPt_NH3()
-    DB_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_DB'
-    kmc_src = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_input'
+    DB_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_DB'
+    kmc_src = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_input'
     fldr_name = os.path.join(DB_fldr, 'structure_' + str(i+1) )
     print fldr_name
     
@@ -100,14 +99,16 @@ def square(i):
     
     cat.occs_to_atoms()
     cat.occs_to_graph()
+    cat.graph_to_KMClattice()
     
     # Build input files
-    build_KMC_input(cat, fldr_name, kmc_src, trajectory = None)
-    
+    write_structure_files(cat, fldr_name)
     
 if __name__ == '__main__': 
     
-    # Run in parallel
-    pool = Pool()
-    pool.map(square, range(0,50))        # change 1 to 96
-    pool.close()
+    square(1)
+    
+    ## Run in parallel
+    #pool = Pool()
+    #pool.map(square, range(0,16))        # change 1 to 96
+    #pool.close()

@@ -456,10 +456,3 @@ class NiPt_NH3(dynamic_cat):
         
         self.KMC_lat.set_cart_coords(cart_coords_list)
         self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)
-            
-            
-    def show(self, fname = 'structure_1', fmat = 'png', transmute_top = False, chop_top = False):
-        '''
-        Use super class method with top layer transmuted to display
-        '''
-        super(NiPt_NH3, self).show(fname = fname, fmat = fmat, chop_top = chop_top)

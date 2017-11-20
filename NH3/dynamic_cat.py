@@ -38,7 +38,6 @@ class dynamic_cat(object):
         self.surface_area = None                        # surface area of the slab in square angstroms
         self.defected_graph = None                      # graph which helps compute things, implemented in subclasses
         self.atom_last_moved = None                     # Index of the variable atom last changed, used to revert moves in simulated annealing
-        self.weights = [0., -1.]                        # For multiobjective optimization
         
         
         '''
@@ -185,37 +184,6 @@ class dynamic_cat(object):
             self.variable_occs[ind] = 1
         else:
             raise NameError('Invalid occupancy.')
-        
-    # Virtual methods    
-    def graph_to_occs(self):
-        '''
-        Virtual method
-        Convert graph representation of defected structure to occupancy vector
-        '''
-        raise NameError('Must be defined in subclass')
-    def occs_to_graph(self):
-        '''
-        Virtual method
-        Convert occupancy vector to graph representation of defected structure
-        '''
-        raise NameError('Must be defined in subclass')
-    def get_site_data(self):
-        '''
-        Virtual method
-        Get data for each site for training the neural network
-        '''
-    def eval_OF(self):
-        '''
-        Virtual method
-        Evaluate objective function for single-objective optimization
-        '''
-        raise NameError('Must be defined in subclass')
-    def eval_OFs(self):
-        '''
-        Virtual method
-        Evaluate objective functions for multi-objective optimization
-        '''
-        raise NameError('Must be defined in subclass')
         
         
     def geo_crossover(self, x1, x2, pt1 = 1, pt2 = 1):
@@ -391,7 +359,7 @@ class dynamic_cat(object):
         return var_ind % self.dim1, var_ind / self.dim1
         
         
-    def show(self, fname = 'structure_1', fmat = 'png', transmute_top = False, chop_top = False):
+    def show(self, fname = 'structure_1', fmat = 'png'):
                 
         '''
         Print image of surface
@@ -407,26 +375,15 @@ class dynamic_cat(object):
         
         self.atoms_defected.set_pbc(True)
         
-        if transmute_top or chop_top:
-            coords = self.atoms_defected.get_positions()
-            a_nums = self.atoms_defected.get_atomic_numbers()
-            chem_symbs = self.atoms_defected.get_chemical_symbols()
-            if_delete = [False for atom in self.atoms_defected]
-            
-            # Change top layer atoms to Ni
-            top_layer_z = np.max(coords[:,2])
-            for atom_ind in range(len(self.atoms_defected)):
-                if coords[atom_ind,2] > top_layer_z - 0.1:
-                    a_nums[atom_ind] = 27
-                    chem_symbs[atom_ind] = 'Co'
-                    if_delete[atom_ind] = True
-            
-            if transmute_top:
-                self.atoms_defected.set_atomic_numbers(a_nums)
-                self.atoms_defected.set_chemical_symbols(chem_symbs)
-            
-            if chop_top:
-                del self.atoms_defected[if_delete]
+        # Remove all Cu atoms
+        chem_symbs = self.atoms_defected.get_chemical_symbols()
+        if_delete = [False for atom in self.atoms_defected]
+        
+        for atom_ind in range(len(self.atoms_defected)):
+            if chem_symbs[atom_ind] == 'Cu':
+                if_delete[atom_ind] = True
+        
+        del self.atoms_defected[if_delete]
                 
         
         if fmat == 'png':

@@ -24,6 +24,8 @@ from train_surrogate import surrogate
 from optimize_SA import *
 from build_KMC_input import *
 
+from mpi4py import MPI      # MPI parallelization
+
 if __name__ == '__main__':
 
     '''
@@ -37,6 +39,8 @@ if __name__ == '__main__':
     data_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/OML_data'
     DB_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_DB'
     kmc_src = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_input'
+    rate_rescale = False
+    n_kmc_reps = 5
     
     sys.setrecursionlimit(1500)             # Needed for large number of atoms
     cat = NiPt_NH3()
@@ -80,9 +84,6 @@ if __name__ == '__main__':
     
     for i in range(gen_size):
         structure_list[i].assign_occs( structure_occs[ intial_struc_inds[i], :] )
-    
-    #for struc in structure_list:
-    #    struc.randomize()           # Use an initial random structure or a training structure
     
     '''
     Online learning loop
@@ -165,40 +166,32 @@ if __name__ == '__main__':
         predicted_activities = np.array(predicted_activities) / cat.atoms_per_layer
         
         '''
-        Optimized structures -> KMC input files
+        Run scaledown KMC for optimized structures (need to make compatible with scaledown)
         '''
+        
+        # Put a plot of the optimization trajectory in the scaledown folder for each structure
+        #plt.figure()
+        #plt.plot(trajectory[0,:], trajectory[1,:], '-')
+        #
+        #plt.xticks(size=18)
+        #plt.yticks(size=18)
+        #plt.xlabel('Metropolis step', size=24)
+        #plt.ylabel('Structure rate', size=24)
+        #plt.xlim([trajectory[0,0], trajectory[0,-1]])
+        #plt.ylim([0, None])
+        #plt.tight_layout()
+        #plt.savefig(os.path.join(fldr_name, 'trajectory.png'), dpi = 600)
+        #plt.close()
+        
+        # Parallelize running the scaledowns -> get the site data out of this
         
         n_fldrs = initial_DB_size + iteration * gen_size
         
         for new_calc_ind in xrange(gen_size):
             build_KMC_input(structure_list[new_calc_ind], os.path.join(DB_fldr, 'structure_' + str(n_fldrs + new_calc_ind + 1) ),
                     kmc_src, trajectory = trajectory_list[new_calc_ind])
-
-        '''
-        Run KMC simulations
-        '''
-        
-        rep = zw.Replicates()
-        rep.ParentFolder = data_fldr
-        rep.run_dirs = [os.path.join(DB_fldr, 'structure_' + str(n_fldrs + new_calc_ind + 1) ) for new_calc_ind in xrange(gen_size)]
-        rep.n_trajectories = gen_size
-        rep.runtemplate = zw.kmc_traj()
-        rep.runtemplate.exe_file = '/home/vlachos/mpnunez/bin/zacros_ML.x'
-        rep.RunAllTrajectories_JobArray(max_cores = 80, server = 'Squidward', job_name = 'zacros_JA')
-        
-        # Remove extra files from the job array run
-        os.remove('zacros_submit_JA.qs')
-        os.remove('dir_list.txt')
-        os.system('rm *.po*')
-        os.system('rm *.o*')
-        
-        
-        '''
-        Read new KMC simulations and see how they performed
-        '''
     
-        
-        # Read folders in parallel
+        # Read folders in parallel (may not need to do this because we have the site propensity data already from scaledown)
         output = read_many_calcs(rep.run_dirs)
         structure_occs_new = output[0]
         site_rates_new = output[1]

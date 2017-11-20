@@ -6,20 +6,15 @@ import time
 import os
 
 
-def optimize(input):
+def optimize(cat, n_cycles = 100):
     
     '''
     Simulated annealing optimization - maximizes the objective function
     
-    :param init_struc: Initial structure
-    :param nn_class: classification neural network
-    :param nn_pred: Prediction neural network
+    :param cat: Initial structure
     '''
     
-    cat = input[0]
-    surrogate = input[1]
-    
-    total_steps = 100 * len( cat.variable_occs )
+    total_steps = n_cycles * len( cat.variable_occs )
     
     #initial_T = 0.6
     initial_T = 0
