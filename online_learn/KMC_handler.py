@@ -41,7 +41,7 @@ def write_structure_files(cat, run_folder, all_symmetries = None):
     cat.KMC_lat.Write_lattice_input(run_folder)
 
     
-def steady_state_rescale(kmc_template, scale_parent_fldr, n_runs = 16, n_batches = 1000, 
+def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n_runs = 16, n_batches = 1000, 
                                 prod_cut = 1000, include_stiff_reduc = True, max_events = int(1e3), 
                                 max_iterations = 20, ss_inc = 1.0, n_samples = 100,
                                 rate_tol = 0.05):
@@ -49,7 +49,7 @@ def steady_state_rescale(kmc_template, scale_parent_fldr, n_runs = 16, n_batches
     '''
     Handles rate rescaling and continuation of KMC runs
     
-    :param kmc_template:            kmc_traj object with information about the physical system
+    :param kmc_input_fldr:          Folder with KMC input files
     :param scale_parent_fldr:       Working directory
     :param n_runs:                  Number of trajectories to run, also the number of processors
     :param include_stiff_reduc:     True to allow for scaledown, False to turn this feature off
@@ -58,6 +58,17 @@ def steady_state_rescale(kmc_template, scale_parent_fldr, n_runs = 16, n_batches
     :param ss_inc:                  Factor to scale the final time by if you have not yet reached steady state
     :param n_samples:               Number of time points to sample for each trajectory
     ''' 
+    
+    '''
+    Make template
+    '''
+    kmc_template = zw.kmc_traj()
+    kmc_template.simin.ReadIn( kmc_input_fldr )
+    kmc_template.mechin.ReadIn( kmc_input_fldr )
+    kmc_template.clusterin.ReadIn( kmc_input_fldr )
+    kmc_template.lat.ReadIn( scale_parent_fldr )
+    kmc_template.exe_file = exe_file
+    kmc_template.gas_prod = product
     
     os.system('rm -r ' + os.path.join(scale_parent_fldr, 'Iteration_*'))        # Delete any existing iteration folders
     sum_file = open(os.path.join(scale_parent_fldr, 'Scaledown_summary.txt'),'w') 
@@ -143,7 +154,7 @@ def steady_state_rescale(kmc_template, scale_parent_fldr, n_runs = 16, n_batches
 
         
         # Test if enough product molecules have been produced
-        enough_product = True
+        enough_product = cum_batch.rate * cum_batch.t_vec[-1] > prod_cut
         
         # Test if rate is computed with sufficient accuracy
         if cum_batch.rate == 0:
@@ -262,7 +273,7 @@ def compute_site_rates(cat, kmc_reps, fldr, product = 'N2', gas_stoich = 1):
     :param kmc_reps: Replates object
     :param product: Gas phase product species
     :param gas_stoich: Stoichiometric coefficient of the product
-    :returns: 
+    :returns: 1-D numpy array of site rates
     '''
     
     kmc_reps.AverageRuns()

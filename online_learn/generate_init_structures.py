@@ -1,5 +1,5 @@
 '''
-Regress a neural network to active site local environment rather than structures
+Create random structures for the initial database
 '''
 
 import sys
@@ -9,6 +9,7 @@ sys.path.append('/home/vlachos/mpnunez/python_packages/ase')
 sys.path.append('/home/vlachos/mpnunez/python_packages/sklearn/lib/python2.7/site-packages')
 
 import os
+import shutil
 import numpy as np
 
 import random
@@ -18,34 +19,23 @@ from multiprocessing import Pool
 from NH3.NiPt_NH3 import NiPt_NH3
 from KMC_handler import *
 
-'''
-Generate data set
-'''
+from mpi4py import MPI      # MPI parallelization
 
+def make_random_structure(i, n_strucs, cat, fldr_name):
 
-
-def square(i):
-
-    np.random.seed(i)
-
-    n_strucs = 50
-    
-    cat = NiPt_NH3()
-    DB_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_DB'
-    kmc_src = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_input'
-    fldr_name = os.path.join(DB_fldr, 'structure_' + str(i+1) )
-    print fldr_name
-    
-    
     '''
-    Randomize the coverage
+    Create a random island structure
+    :param i: Index of this structure
+    :param n_strucs: Total number of structure being made
+    :param cat: Catalyst structure
+    :param fldr_name: Folder to write the files into
     '''
-    #cat.randomize(coverage = 0.1 + 0.8 * float(i) / (n_strucs+1), build_structure = False)
     
     '''
     Make islands
     '''
     
+    np.random.seed(i)
     cat.variable_occs = [0 for j in range(cat.atoms_per_layer)]
     n_tops = int( (3 + 15 * float(i) / (n_strucs+1)))
     top_sites = np.random.choice( range(len(cat.variable_atoms)), size=n_tops, replace=False )
@@ -97,6 +87,7 @@ def square(i):
         ind1 = cat.sym_inds_to_var_ind(sym_inds[0] +2, sym_inds[1] - 2)
         cat.variable_occs[ind1] = 1
     
+    # Build catalyst structure
     cat.occs_to_atoms()
     cat.occs_to_graph()
     cat.graph_to_KMClattice()
@@ -104,11 +95,47 @@ def square(i):
     # Build input files
     write_structure_files(cat, fldr_name)
     
+    
 if __name__ == '__main__': 
     
-    square(1)
+    ''' User input '''
+    n_strucs = 16
+    cat = NiPt_NH3()
+    DB_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_DB'
+    ''' '''
     
-    ## Run in parallel
-    #pool = Pool()
-    #pool.map(square, range(0,16))        # change 1 to 96
-    #pool.close()
+    
+    
+    # Run in parallel
+    COMM = MPI.COMM_WORLD
+    
+    # Clear folder contents
+    if COMM.rank == 0:
+        for the_file in os.listdir(DB_fldr):
+            file_path = os.path.join(DB_fldr, the_file)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print(e)
+                
+    COMM.Barrier()
+    
+    # Collect whatever has to be done in a list. Here we'll just collect a list of
+    # numbers. Only the first rank has to do this.
+    if COMM.rank == 0:
+        jobs = range(n_strucs)
+        jobs = [jobs[_i::COMM.size] for _i in range(COMM.size)]             # Split into however many cores are available.
+    else:
+        jobs = None
+    
+    jobs = COMM.scatter(jobs, root=0)           # Scatter jobs across cores.
+    
+    # Now each rank just does its jobs and collects everything in a results list.
+    # Make sure to not use super big objects in there as they will be pickled to be
+    # exchanged over MPI.
+    for job in jobs:
+        fldr_name = os.path.join(DB_fldr, 'structure_' + str(job+1) )
+        make_random_structure(job, n_strucs, cat, fldr_name)
