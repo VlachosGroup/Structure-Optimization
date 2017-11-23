@@ -6,12 +6,13 @@ import time
 import os
 
 
-def optimize(cat, n_cycles = 100):
+def optimize(cat, surrogate, syms = None, n_cycles = 100):
     
     '''
     Simulated annealing optimization - maximizes the objective function
     
     :param cat: Initial structure
+    :param surrogate: Surrogate model
     '''
     
     total_steps = n_cycles * len( cat.variable_occs )
@@ -30,7 +31,8 @@ def optimize(cat, n_cycles = 100):
     
     # Evaluate initial structure
     x = cat.variable_occs
-    syms = cat.generate_all_translations()
+    if syms is None:
+        syms = cat.generate_all_translations()
     OF = surrogate.eval_rate( syms )
     
     # Record data
@@ -100,4 +102,4 @@ def optimize(cat, n_cycles = 100):
     
     cat.assign_occs(x)
 
-    return [ x , np.array([step_rec, OF_rec])]
+    return [ x , syms, np.array([step_rec, OF_rec])]

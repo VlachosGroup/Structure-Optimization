@@ -54,7 +54,10 @@ if __name__ == '__main__':
     # Make sure to not use super big objects in there as they will be pickled to be
     # exchanged over MPI.
     for job in jobs:
-        steady_state_rescale(kmc_input_fldr, job, exe_file, 'N2', n_runs = 5, n_batches = 1000, 
+        cum_reps = steady_state_rescale(kmc_input_fldr, job, exe_file, 'N2', n_runs = 5, n_batches = 1000, 
                                 prod_cut = 1000, include_stiff_reduc = True, max_events = int(1e3), 
-                                max_iterations = 3, ss_inc = 1.0, n_samples = 100,
+                                max_iterations = 20, ss_inc = 1.0, n_samples = 100,
                                 rate_tol = 0.05)
+                                
+        site_rates = compute_site_rates(cat, cum_reps, gas_prod = 'N2', gas_stoich = 1)
+        np.save(os.path.join(job, 'site_rates.npy'), site_rates)

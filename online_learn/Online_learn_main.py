@@ -38,60 +38,55 @@ if __name__ == '__main__':
     end_iteration = 10
     data_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/OML_data'
     DB_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_DB'
-    kmc_src = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_input'
+    kmc_input_fldr = '/home/vlachos/mpnunez/NN_data/NH3_data_1/KMC_input'
+    exe_file = '/home/vlachos/mpnunez/bin/zacros_ML.x'
     rate_rescale = False
     n_kmc_reps = 5
     
     sys.setrecursionlimit(1500)             # Needed for large number of atoms
     cat = NiPt_NH3()
     
+    # Run in parallel
+    COMM = MPI.COMM_WORLD
+    COMM.Barrier()
+    
     '''
     Read KMC data from database
     '''
     
-    os.chdir(data_fldr)
+    fldr_list = [os.path.join(DB_fldr, 'structure_' + str(i+1) ) for i in xrange(initial_DB_size)]
+    sym_list = []
+    site_rate_list = []
+    for fldr in fldr_list:
+        sym_list.append( np.load(os.path.join(fldr, 'occ_symmetries.npy')) )
+        site_rate_list.append( np.load(os.path.join(fldr, 'site_rates.npy')) )
+    
+    structure_occs = np.vstack(sym_list)
+    site_rates = np.vstack(site_rate_list)
 
-    # Read from existing pickle file
-    if False:#os.path.isfile('Iteration_0_X.npy'): 
-    
-        structure_occs = np.load('Iteration_0_X.npy')
-        site_rates = np.load('Iteration_0_Y.npy')
-    
-    # Read all KMC files
-    else:
-    
-        fldr_list = [os.path.join(DB_fldr, 'structure_' + str(i+1) ) for i in xrange(initial_DB_size)]
-    
-        # Read folders in parallel
-        output = read_many_calcs(fldr_list)
-        structure_occs = output[0]
-        site_rates = output[1]
-        
-        #np.save('Iteration_0_X.npy', structure_occs)
-        #np.save('Iteration_0_Y.npy', site_rates)
-
-    structure_occs_new = structure_occs
     
     '''
     Initialize new structures
     '''
     
-    surr = surrogate()
-    
+
     # Initialize optimization with random structures
     structure_list = [NiPt_NH3() for i in xrange(gen_size)]
     intial_struc_inds = random.sample(range(initial_DB_size), gen_size)     # choose some of training structures as initial structures
     
     for i in range(gen_size):
-        structure_list[i].assign_occs( structure_occs[ intial_struc_inds[i], :] )
+        structure_list[i].assign_occs( structure_occs[ 3 * cat.atoms_per_layer * intial_struc_inds[i], :] )
+    
+    structure_list_proc = COMM.scatter(structure_list, root=0) 
+    
+    structure_IDs_all = range(initial_DB_size - gen_size+1, initial_DB_size+1)
+    structure_IDs = COMM.scatter(structure_IDs_all, root=0) 
     
     '''
     Online learning loop
     '''
     
     for iteration in range(start_iteration-1, end_iteration):
-
-        os.chdir(data_fldr)
     
         '''
         Update training data
@@ -107,10 +102,11 @@ if __name__ == '__main__':
         Train the surrogate model
         '''
         
-        surr.generate_symmetries(structure_occs_new, cat)      # Add symmetries to the list in the surrogate model
+        surr = surrogate()
+        surr.all_syms = structure_occs
         surr.partition_data_set(site_rates)
         surr.train_classifier()
-        surr.train_regressor()
+        surr.train_regressor(reg_parity_fname = 'Iteration_' + str(iteration+1) + '_site_parity')
 
         
         '''
@@ -125,107 +121,120 @@ if __name__ == '__main__':
             syms = surr.all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
             structure_rates_NN[i] = surr.eval_rate( syms ) / cat.atoms_per_layer
         
-        
-        plt.figure()
-        plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
-        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN ])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
-        plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
-        #plt.xlim([0, 0.50])
-        #plt.ylim([0, 0.50])
-        plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
-        plt.close()
+        if COMM.rank == 0:
+            plt.figure()
+            plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
+            all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN ])
+            par_min = min( all_point_values )
+            par_max = max( all_point_values )
+            plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
+            
+            plt.xticks(size=18)
+            plt.yticks(size=18)
+            plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
+            plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
+            plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
+            plt.tight_layout()
+            plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
+            plt.close()
         
         
         '''
-        Optimize structures using the surrogate model -> generate structures to add
+        Optimize structures using the surrogate model
         '''
         
-        input_list = [ [ struc, surr ] for struc in structure_list ]
+        # Update structure IDs
+        structure_IDs = [i + gen_size for i in structure_IDs]
         
-        pool = Pool()
-        outputs = pool.map(optimize, input_list)
-        pool.close()
+        for ind in xrange(len(structure_list_proc)):
         
-        trajectory_list = []
-        predicted_activities = []
-        for i in range(len(outputs)):
-            structure_list[i].assign_occs(outputs[i][0])
-            traj = outputs[i][1]
-            trajectory_list.append(traj)
-            predicted_activities.append(traj[1][-1])
-        
-        predicted_activities = np.array(predicted_activities) / cat.atoms_per_layer
-        
-        '''
-        Run scaledown KMC for optimized structures (need to make compatible with scaledown)
-        '''
-        
-        # Put a plot of the optimization trajectory in the scaledown folder for each structure
-        #plt.figure()
-        #plt.plot(trajectory[0,:], trajectory[1,:], '-')
-        #
-        #plt.xticks(size=18)
-        #plt.yticks(size=18)
-        #plt.xlabel('Metropolis step', size=24)
-        #plt.ylabel('Structure rate', size=24)
-        #plt.xlim([trajectory[0,0], trajectory[0,-1]])
-        #plt.ylim([0, None])
-        #plt.tight_layout()
-        #plt.savefig(os.path.join(fldr_name, 'trajectory.png'), dpi = 600)
-        #plt.close()
-        
-        # Parallelize running the scaledowns -> get the site data out of this
-        
-        n_fldrs = initial_DB_size + iteration * gen_size
-        
-        for new_calc_ind in xrange(gen_size):
-            build_KMC_input(structure_list[new_calc_ind], os.path.join(DB_fldr, 'structure_' + str(n_fldrs + new_calc_ind + 1) ),
-                    kmc_src, trajectory = trajectory_list[new_calc_ind])
+            struc = structure_list_proc[ind]
+            outputs = optimize( struc, surr, syms = None)       # [ x , syms, np.array([step_rec, OF_rec])]
+            trajectory = outputs[2]
+
+            '''
+            Write structure information into database folder
+            '''
+
+            # Write data for structure
+            struc_folder = os.path.join(DB_fldr, 'structure_' + str(structure_IDs[ind]) )
+            write_structure_files(struc[ind], struc_folder, all_symmetries = outputs[1])
+            
+            # Put a plot of the optimization trajectory in the scaledown folder for each structure
+            plt.figure()
+            plt.plot(trajectory[0,:], trajectory[1,:], '-')
+            plt.xticks(size=18)
+            plt.yticks(size=18)
+            plt.xlabel('Metropolis step', size=24)
+            plt.ylabel('Structure rate', size=24)
+            plt.xlim([trajectory[0,0], trajectory[0,-1]])
+            plt.ylim([0, None])
+            plt.tight_layout()
+            plt.savefig(os.path.join(struc_folder, 'sim_anneal_trajectory'), dpi = 600)
+            plt.close()
+            
+            # Put a plot of the optimization trajectory in the scaledown folder for each structure
+            np.save(os.path.join(struc_folder, 'sim_anneal_trajectory.npy'), trajectory)
+            
+            '''
+            Run KMC and compute site rates
+            '''
+            
+            cum_reps = steady_state_rescale(kmc_input_fldr, struc_folder, exe_file, 'N2', n_runs = 5, n_batches = 1000, 
+                                prod_cut = 1000, include_stiff_reduc = True, max_events = int(1e3), 
+                                max_iterations = 20, ss_inc = 1.0, n_samples = 100,
+                                rate_tol = 0.05)
+                                
+            site_rates = compute_site_rates(struc, cum_reps, gas_prod = 'N2', gas_stoich = 1)
+            np.save(os.path.join(struc_folder, 'site_rates.npy'), site_rates)
+            
+            
     
-        # Read folders in parallel (may not need to do this because we have the site propensity data already from scaledown)
-        output = read_many_calcs(rep.run_dirs)
-        structure_occs_new = output[0]
-        site_rates_new = output[1]
+        '''
+        Read new KMC files
+        '''
         
-        np.save('Iteration_' + str(iteration+1) + 'opt_X.npy', structure_occs_new)
-        np.save('Iteration_' + str(iteration+1) + 'opt_Y.npy', site_rates_new)
+        fldr_list = [os.path.join(DB_fldr, 'structure_' + str(i+1) ) for i in xrange(initial_DB_size)]
+        sym_list = []
+        site_rate_list = []
+        for fldr in fldr_list:
+            sym_list.append( np.load(os.path.join(fldr, 'occ_symmetries.npy')) )
+            site_rate_list.append( np.load(os.path.join(fldr, 'site_rates.npy')) )
+        
+        structure_occs_new = np.vstack(sym_list)
+        site_rates_new = np.vstack(site_rate_list)
         
         structure_rates_KMC_new = np.sum(site_rates_new, axis = 1) / cat.atoms_per_layer      # add site rates to get structure rates
+        
+        # Read predicted_activities from trajectory files - UNFINISHED
+        predicted_activities = []   
+        predicted_activities = np.array(predicted_activities) / cat.atoms_per_layer
         
         '''
         Plot surrogate parity 
         '''
         
-        # Save parity plot data for later analysis
-        np.save('Iteration_' + str(iteration+1) + '_structure_rates_KMC.npy', structure_rates_KMC)
-        np.save('Iteration_' + str(iteration+1) + '_structure_rates_NN.npy', structure_rates_NN)
-        np.save('Iteration_' + str(iteration+1) + '_structure_rates_KMC_new.npy', structure_rates_KMC_new)
-        np.save('Iteration_' + str(iteration+1) + '_predicted_activities.npy', predicted_activities)
+        if COMM.rank == 0:
         
-        plt.figure()
-        plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
-        plt.plot(structure_rates_KMC_new, predicted_activities, 's')
-        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new, predicted_activities])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
-        plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
-        #plt.xlim([0, 0.50])
-        #plt.ylim([0, 0.50])
-        plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
-        plt.close()
+            # Save parity plot data for later analysis
+            np.save('Iteration_' + str(iteration+1) + '_structure_rates_KMC.npy', structure_rates_KMC)
+            np.save('Iteration_' + str(iteration+1) + '_structure_rates_NN.npy', structure_rates_NN)
+            np.save('Iteration_' + str(iteration+1) + '_structure_rates_KMC_new.npy', structure_rates_KMC_new)
+            np.save('Iteration_' + str(iteration+1) + '_predicted_activities.npy', predicted_activities)
+            
+            plt.figure()
+            plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
+            plt.plot(structure_rates_KMC_new, predicted_activities, 's')
+            all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new, predicted_activities])
+            par_min = min( all_point_values )
+            par_max = max( all_point_values )
+            plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
+            
+            plt.xticks(size=18)
+            plt.yticks(size=18)
+            plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
+            plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
+            plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
+            plt.tight_layout()
+            plt.savefig('Iteration_' + str(iteration+1) + '_optimum_parity', dpi = 600)
+            plt.close()

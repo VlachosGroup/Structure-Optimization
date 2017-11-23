@@ -50,23 +50,6 @@ class surrogate(object):
         else:
             site_rates = self.Y_scaler.inverse_transform( self.predictor.predict( all_trans[active_site_list,:] ) )
             return np.sum( site_rates ) / normalize_fac
-    
-    
-    def generate_symmetries(self,structure_occs, cat):
-    
-        '''
-        :param structure_occs:   Occupancy vectors for each structure
-        :param site_propensities:   Site propensities for each structure
-        '''
-    
-        for x in structure_occs:            # Can we parallelize this?
-        
-            cat.variable_occs = x
-            all_trans_and_rot = cat.generate_all_translations_and_rotations()
-            if self.all_syms is None:
-                self.all_syms = all_trans_and_rot
-            else:
-                self.all_syms = np.vstack([self.all_syms, all_trans_and_rot])
 
                 
     def partition_data_set(self,site_rates):
@@ -114,7 +97,7 @@ class surrogate(object):
         print 'Fraction wrong in training set: ' + str(frac_wrong_train)
     
     
-    def train_regressor(self):    
+    def train_regressor(self, reg_parity_fname = None):    
         
         '''
         Train a neural network to predict site rates
@@ -146,26 +129,25 @@ class surrogate(object):
         Parity plot for the neural network fit
         '''
         
-        mat.rcParams['mathtext.default'] = 'regular'
-        mat.rcParams['text.latex.unicode'] = 'False'
-        mat.rcParams['legend.numpoints'] = 1
-        mat.rcParams['lines.linewidth'] = 2
-        mat.rcParams['lines.markersize'] = 12
+        if not reg_parity_fname is None:
         
-        plt.figure()
-        plt.plot(self.Y_reg, predictions, 'o')
-        all_point_values = np.hstack([self.Y_reg, predictions])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel('Kinetic Monte Carlo', size=24)
-        plt.ylabel('Neural network', size=24)
-        #plt.xlim([0, 0.50])
-        #plt.ylim([0, 0.50])
-        #plt.legend(['train', 'test'], loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig('Iteration_' + str(0) + '_training_site_parity_rot', dpi = 600)
-        plt.close()
+            mat.rcParams['mathtext.default'] = 'regular'
+            mat.rcParams['text.latex.unicode'] = 'False'
+            mat.rcParams['legend.numpoints'] = 1
+            mat.rcParams['lines.linewidth'] = 2
+            mat.rcParams['lines.markersize'] = 12
+            
+            plt.figure()
+            plt.plot(self.Y_reg, predictions, 'o')
+            all_point_values = np.hstack([self.Y_reg, predictions])
+            par_min = min( all_point_values )
+            par_max = max( all_point_values )
+            plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
+            
+            plt.xticks(size=18)
+            plt.yticks(size=18)
+            plt.xlabel('Kinetic Monte Carlo', size=24)
+            plt.ylabel('Neural network', size=24)
+            plt.tight_layout()
+            plt.savefig(reg_parity_fname, dpi = 600)
+            plt.close()

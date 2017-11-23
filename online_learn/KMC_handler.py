@@ -144,13 +144,19 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         
         # Test steady-state
         cum_batch.AverageRuns()
+        
+        # Check if structure is inactive
+        if cum_batch.t_vec[-1] == 0:
+            sum_file.write('\nStructure is inactive')
+            break
+        
         acf_data = cum_batch.Compute_rate()
         
         sum_file.write( '\nIteration ' + str(iteration) )
-        sum_file.write( 'Batches per trajectory: ' + str(cum_batch.Nbpt) )
-        sum_file.write( 'Batch length (s): ' + str(cum_batch.batch_length) )
-        sum_file.write( 'Rate: ' + str(cum_batch.rate) )
-        sum_file.write( 'Rate confidence interval: ' + str(cum_batch.rate_CI) )
+        sum_file.write( '\nBatches per trajectory: ' + str(cum_batch.Nbpt) )
+        sum_file.write( '\nBatch length (s): ' + str(cum_batch.batch_length) )
+        sum_file.write( '\nRate: ' + str(cum_batch.rate) )
+        sum_file.write( '\nRate confidence interval: ' + str(cum_batch.rate_CI) )
 
         
         # Test if enough product molecules have been produced
@@ -162,8 +168,8 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         else:
             rate_accurate = (cum_batch.rate_CI / cum_batch.rate < rate_tol)
         
-        sum_file.write( 'Decorrelated? ' + str(enough_product) )
-        sum_file.write( 'Rate accurate? ' + str(rate_accurate) )
+        sum_file.write( '\nEnough product? ' + str(enough_product) )
+        sum_file.write( '\nRate accurate? ' + str(rate_accurate) )
         sum_file.write( '\n' )
         
         is_steady_state = enough_product and rate_accurate
@@ -265,7 +271,7 @@ def read_scaledown(RunPath):        # Need to add option for no scaledown
     return cum_batch
     
     
-def compute_site_rates(cat, kmc_reps, fldr, product = 'N2', gas_stoich = 1):
+def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
     
     '''
     Read structure occupancies and site propensities from a KMC folder
@@ -280,8 +286,6 @@ def compute_site_rates(cat, kmc_reps, fldr, product = 'N2', gas_stoich = 1):
     avg_traj = kmc_reps.runAvg
     
     n_rxns = len( avg_traj.genout.RxnNameList )
-    cat = NiPt_NH3()
-    cat.load_defects(os.path.join(fldr_name,'structure.xsd'))
     site_props_ss = np.zeros( [cat.atoms_per_layer, n_rxns] )
     
     '''
@@ -333,6 +337,5 @@ def compute_site_rates(cat, kmc_reps, fldr, product = 'N2', gas_stoich = 1):
             site_props_ss[defect_ind,:] = avg_traj.TS_site_props_ss[i,:]    
     
     site_rates = np.matmul( site_props_ss, TOF_stoich ) / gas_stoich
-    np.save(os.path.join(fldr, 'site_rates.npy'), site_rates)
     
     return site_rates

@@ -99,7 +99,7 @@ def make_random_structure(i, n_strucs, cat, fldr_name):
 if __name__ == '__main__': 
     
     ''' User input '''
-    n_strucs = 16
+    n_strucs = 32
     cat = NiPt_NH3()
     DB_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_DB'
     ''' '''
