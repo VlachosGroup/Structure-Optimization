@@ -6,20 +6,20 @@ import time
 import os
 
 
-def optimize(cat, surrogate, syms = None, n_cycles = 100):
+def optimize(cat, surrogate, syms = None, n_cycles = 100, c = 0.05):
     
     '''
     Simulated annealing optimization - maximizes the objective function
     
     :param cat: Initial structure
     :param surrogate: Surrogate model
+    :param syms: All 
+    :param n_cycles: Multiple by the number of Ni sites to get the total number of Metropolis steps
+    :param c: Cooling schedule parameter. Should be comparable than the largest possible change in the objective function
     '''
     
     total_steps = n_cycles * len( cat.variable_occs )
     
-    #initial_T = 0.6
-    initial_T = 0
-    c = 0.05        # c = 0.5 for AB_data_3
     
     # Trajectory recording parameters
     n_record = 100
@@ -44,9 +44,7 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100):
     
     for step in xrange( total_steps ):
         
-        #Metro_temp = initial_T * (1 - float(step) / total_steps)            # Linear cooling schedule
         Metro_temp = c / np.log(step+2)                                                      # Logarithmic cooling schedule
-        
         
         '''
         Random move

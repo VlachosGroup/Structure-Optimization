@@ -65,7 +65,8 @@ class surrogate(object):
         y_max = np.max(site_rates_flat)
         active_cut = 0.005
         
-        print site_rates_flat.shape
+        if y_max == 0.:
+            raise NameError('No active sites in database.')
         
         self.X_reg = []
         self.Y_reg = []
@@ -109,8 +110,6 @@ class surrogate(object):
         Y = self.Y_scaler.transform(self.Y_reg.reshape(-1,1))
         Y = Y.reshape(-1,1)
         
-        print '\n'
-        print self.Y_reg.shape
         '''
         Train neural network - Regression
         '''
