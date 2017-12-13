@@ -440,19 +440,16 @@ class NiPt_NH3(dynamic_cat):
         #'hcp_Pt',	'top_Pt', 'hcp_2edge_Pt_3fcc',	'fcc_edge_Pt_3fcc',	'fcc_edge_Pt_3hcp',	'hcp_edge_Pt_3fcc',	'hcp_edge_Pt_3hcp',
         #    'step_100',	'step_110',	'fcc_edge_Ni_3fcc',	'fcc_edge_Ni_3hcp',	'hcp_edge_Ni_3fcc',	'hcp_edge_Ni_3hcp']
         
-        self.KMC_lat.site_type_names = ['fcc_Ni',	'hcp_Ni',	'top_Ni',	'top_corner_Ni',	'top_edge_Ni',
+        self.KMC_lat.site_type_names = ['fcc_Ni',	'top_Ni', 'top_edge_Ni',
             'fcc_edge_Ni_3fcc',	'fcc_edge_Ni_3hcp',	'hcp_edge_Ni_3fcc',	'hcp_edge_Ni_3hcp']
         
         # All atoms with a defined site type
+        site_ind_dict = {1:1, 3:2, 5:3, 16:4, 17:5, 18:6, 19:7}
         cart_coords_list = []
         for i in range(n_at):
-            #if not self.defected_graph.node[i]['site_type'] is None:
-            if self.defected_graph.node[i]['site_type'] in [1,2,3,4,5,16,17,18,19]:
-                if self.defected_graph.node[i]['site_type'] > 12:
-                    self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'] - 10)
-                else:
-                    self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'])
+            if self.defected_graph.node[i]['site_type'] in site_ind_dict:
+                self.KMC_lat.site_type_inds.append( site_ind_dict[ self.defected_graph.node[i]['site_type'] ])
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
-        
+
         self.KMC_lat.set_cart_coords(cart_coords_list)
         self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)

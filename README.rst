@@ -17,4 +17,4 @@ Publications
 
 Developers
 -----------
-* Marcel Nunez (mpnunez@udel.edu)
+* Marcel Nunez (mpnunez28@gmail.com)

@@ -10,15 +10,28 @@ import matplotlib as mat
 import matplotlib.pyplot as plt
     
 
-def write_structure_files(cat, run_folder, all_symmetries = None):
+def write_structure_files(cat, run_folder, all_symmetries = None, clear_fldr = False):
     '''
     Write data so that the structure can be identified by KMC evaluator
     :param cat: Catalyst structure object
     :param run_folder: Folder to write these files into
     '''
     
+    # Make the folder or clear its contents
+    
     if not os.path.exists(run_folder):
         os.makedirs(run_folder)
+    
+    if clear_fldr:
+        for the_file in os.listdir(run_folder):
+            file_path = os.path.join(run_folder, the_file)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print(e)
     
     # Occupancy vector
     np.save(os.path.join(run_folder, 'occupancies.npy'), cat.variable_occs)
@@ -44,7 +57,7 @@ def write_structure_files(cat, run_folder, all_symmetries = None):
 def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n_runs = 16, n_batches = 1000, 
                                 prod_cut = 1000, include_stiff_reduc = True, max_events = int(1e3), 
                                 max_iterations = 20, ss_inc = 1.0, n_samples = 100,
-                                rate_tol = 0.05):
+                                rate_tol = 0.05, j_name = 'Zacros_JA'):
 
     '''
     Handles rate rescaling and continuation of KMC runs
@@ -134,7 +147,7 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         
         # Run jobs and read output
         cur_batch.BuildJobFiles(init_states = initial_states)
-        cur_batch.RunAllTrajectories_JobArray(server = 'Squidward', job_name = 'Iteration_' + str(iteration) )  
+        cur_batch.RunAllTrajectories_JobArray(server = 'Squidward', job_name = j_name )  
         cur_batch.ReadMultipleRuns()
         
         if iteration == 1:
@@ -145,10 +158,21 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         # Test steady-state
         cum_batch.AverageRuns()
         
+        # Record information about the iteration
+        cum_batch.runAvg.PlotGasSpecVsTime()
+        cum_batch.runAvg.PlotSurfSpecVsTime()
+        
         # Check if structure is inactive
         if cum_batch.t_vec[-1] == 0:
             sum_file.write('\nStructure is inactive')
             break
+            
+        # Check if structure has just adsorption/desorption and nothing else ocurring
+        if iteration > 4:
+            final_gas_counts = cum_batch.runAvg.specnumout.spec[-1,len( cum_batch.runAvg.simin.surf_spec ) : len( cum_batch.runAvg.simin.surf_spec )+len( cum_batch.runAvg.simin.gas_spec ) : ]
+            if np.sum(np.abs(final_gas_counts)) < 20:
+                sum_file.write('\nOnly adsorption/desorption is ocurring.')
+                break
         
         acf_data = cum_batch.Compute_rate()
         
@@ -173,11 +197,8 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         sum_file.write( '\n' )
         
         is_steady_state = enough_product and rate_accurate
-        # Terminate if the structure is inactive
         
-        # Record information about the iteration
-        cum_batch.runAvg.PlotGasSpecVsTime()
-        cum_batch.runAvg.PlotSurfSpecVsTime()
+        
         
         cur_batch.AverageRuns()
         cur_batch.runAvg.PlotElemStepFreqs()
@@ -232,8 +253,9 @@ def ProcessStepFreqs(run, stiff_cut = 100.0, delta = 0.05, equilib_cut = 0.1):  
     
     # Find slow scale rate
     slow_freqs = [1.0]      # put an extra 1 in case no slow reactions occur
-    for i in slow_rxns:
-        slow_freqs.append(tot_freqs[i])
+    slow_freqs.append(tot_freqs[9])     # always use desorption of N2* as the slow scale
+    #for i in slow_rxns:
+    #    slow_freqs.append(tot_freqs[i])
     slow_scale = np.max(slow_freqs)
     
     # Adjust fast reactions closer to the slow scale
@@ -254,8 +276,11 @@ def read_scaledown(RunPath):        # Need to add option for no scaledown
     :returns: Cumulative replicates object with a group of trajectories
     '''
 
-    n_folders = len(os.listdir(RunPath))            # Count the iterations
-
+    n_folders = 0
+    for fldr_or_file in os.listdir(RunPath):
+        if os.path.isdir(os.path.join(RunPath,fldr_or_file)):
+            n_folders += 1
+    
     cum_batch = None
     for ind in range(1,n_folders+1):
         
@@ -267,7 +292,8 @@ def read_scaledown(RunPath):        # Need to add option for no scaledown
             cum_batch = x
         else:
             cum_batch = append_replicates(cum_batch, x)
-            
+    
+    cum_batch.AverageRuns()
     return cum_batch
     
     
@@ -284,6 +310,9 @@ def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
     
     kmc_reps.AverageRuns()
     avg_traj = kmc_reps.runAvg
+    
+    if kmc_reps.runAvg.lat.text_only == True:
+        raise NameError('lattice_output.dat has not been read')
     
     n_rxns = len( avg_traj.genout.RxnNameList )
     site_props_ss = np.zeros( [cat.atoms_per_layer, n_rxns] )
@@ -312,7 +341,7 @@ def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
     d_cut = 0.1     # Matches are not found if we lower this to 0.01
     
     mol_cart_coords = cat.atoms_template.get_positions()[:, 0:2:]
-    
+
     for i in range(len(avg_traj.lat.site_type_inds)):
     
         lat_site_coords = avg_traj.lat.cart_coords[i, :]

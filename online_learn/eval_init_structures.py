@@ -58,6 +58,7 @@ if __name__ == '__main__':
                                 prod_cut = 1000, include_stiff_reduc = True, max_events = int(1e3), 
                                 max_iterations = 20, ss_inc = 1.0, n_samples = 100,
                                 rate_tol = 0.05)
-                                
+        
+        cum_reps.runAvg.lat.Read_lattice_output( os.path.join(job,'Iteration_1','1') )
         site_rates = compute_site_rates(cat, cum_reps, gas_prod = 'N2', gas_stoich = 1)
         np.save(os.path.join(job, 'site_rates.npy'), site_rates)
