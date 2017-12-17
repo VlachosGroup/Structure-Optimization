@@ -32,7 +32,7 @@ class surrogate(object):
         self.Y_scaler = None
         
     
-    def eval_rate(self, all_trans, normalize_fac = 1):
+    def eval_rate(self, all_trans, normalize = False):
     
         '''
         Surrogate model using a classifier and regressor
@@ -49,7 +49,10 @@ class surrogate(object):
             return 0
         else:
             site_rates = self.Y_scaler.inverse_transform( self.predictor.predict( all_trans[active_site_list,:] ) )
-            return np.sum( site_rates ) / normalize_fac
+            if normalize:
+                return np.sum( site_rates ) / len(site_rates)
+            else:
+                return np.sum( site_rates )
 
                 
     def partition_data_set(self,site_rates):
