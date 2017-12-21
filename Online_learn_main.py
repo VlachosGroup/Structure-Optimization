@@ -53,6 +53,39 @@ def read_database(db_fldr):
     return [structure_occs, site_rates]     # Return list of all symmetries and site rates
     
 
+def plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new = None, predicted_activities = None):
+    '''
+    Plot surrogate parity
+    '''
+
+    mat.rcParams['mathtext.default'] = 'regular'
+    mat.rcParams['text.latex.unicode'] = 'False'
+    mat.rcParams['legend.numpoints'] = 1
+    mat.rcParams['lines.linewidth'] = 2
+    mat.rcParams['lines.markersize'] = 12
+
+    plt.figure()
+    if structure_rates_KMC_new is None:
+        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN])
+    else:
+        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new, predicted_activities])
+    par_min = min( all_point_values )
+    par_max = max( all_point_values )
+    plt.plot( [par_min, par_max], [par_min, par_max], '--', color = 'k', label = None)
+    plt.plot(structure_rates_KMC, structure_rates_NN, 'o', label = 'Training (' + str(len(structure_rates_KMC)) + ')')
+    if not structure_rates_KMC_new is None:
+        plt.plot(structure_rates_KMC_new, predicted_activities, 's', label = 'Optima')
+    
+    plt.xticks(size=18)
+    plt.yticks(size=18)
+    plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
+    plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
+    plt.legend(loc=4, prop={'size':20}, frameon=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(curr_fldr, 'structure_parity'), dpi = 600)
+    plt.close()
+        
+    
 if __name__ == '__main__':
 
     '''
@@ -73,7 +106,7 @@ if __name__ == '__main__':
     DB_fldr = os.path.join(main_fldr, 'KMC_DB')
     kmc_input_fldr = os.path.join(main_fldr, 'KMC_input')
     exe_file = '/home/vlachos/mpnunez/bin/zacros_ML.x'
-    
+    structure_proc = NiPt_NH3()                     # structure for this processor
 
     '''
     Initialize new structures
@@ -85,8 +118,6 @@ if __name__ == '__main__':
     COMM = MPI.COMM_WORLD
     COMM.Barrier()
 
-    # Initialize optimization with random structures
-    structure_proc = NiPt_NH3()                     # structure for this processor
     structure_proc.randomize(coverage = 0.5)        # randomize the occupancies
 
     
@@ -137,8 +168,10 @@ if __name__ == '__main__':
         surr = surrogate()
         surr.all_syms = structure_occs
         surr.partition_data_set(site_rates)
-        surr.train_classifier()
-        surr.train_regressor(reg_parity_fname = os.path.join( curr_fldr , 'site_parity'))
+        surr.train_decision_tree_regressor(site_rates)
+        #surr.partition_data_set(site_rates)
+        #surr.train_classifier()
+        #surr.train_regressor(reg_parity_fname = os.path.join( curr_fldr , 'site_parity'))
 
         '''
         Evaluate structures in the training set with the surrogate model
@@ -152,21 +185,7 @@ if __name__ == '__main__':
             syms = surr.all_syms[ i * n_sites * 3 : (i+1) * n_sites * 3 : 3 , :]         # extract translations only from the symmetries
             structure_rates_NN[i] = surr.eval_rate( syms ) / structure_proc.atoms_per_layer
         
-        plt.figure()
-        plt.plot(structure_rates_KMC, structure_rates_NN, 'o')
-        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN ])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k')  # Can do this for all outputs
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
-        plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
-        plt.legend(['Training (' + str(len(structure_rates_KMC)) + ')', 'Optima'], loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig(os.path.join(curr_fldr, 'structure_parity'), dpi = 600)
-        plt.close()
+        plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN)
         
 
         '''
@@ -211,38 +230,15 @@ if __name__ == '__main__':
             traj = np.load(os.path.join(fldr, 'sim_anneal_trajectory.npy'))
             predicted_activities.append(traj[1,-1])
         
-        structure_occs_new = np.vstack(sym_list)
         site_rates_new = np.vstack(site_rate_list)
         
         # Compute KMC evaluated and predicted rates for the new structures
         structure_rates_KMC_new = np.sum(site_rates_new, axis = 1) / structure_proc.atoms_per_layer      # add site rates to get structure rates           
         predicted_activities = np.array(predicted_activities)
         
-        '''
-        Plot surrogate parity
-        '''
-        
         # Save parity plot data for later analysis
         np.save(os.path.join(curr_fldr, 'structure_rates_KMC.npy'), structure_rates_KMC)
         np.save(os.path.join(curr_fldr, 'structure_rates_NN.npy'), structure_rates_NN)
-        np.save(os.path.join(curr_fldr, 'structure_rates_KMC_new.npy'), structure_rates_KMC_new)
-        np.save(os.path.join(curr_fldr, 'predicted_activities.npy'), predicted_activities)
+        plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new = structure_rates_KMC_new, predicted_activities = predicted_activities)
         
-        plt.figure()
-        all_point_values = np.hstack([structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new, predicted_activities])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '-', color = 'k', label = None)  # Can do this for all outputs
-        plt.plot(structure_rates_KMC, structure_rates_NN, 'o', label = 'Training (' + str(len(structure_rates_KMC)) + ')')
-        plt.plot(structure_rates_KMC_new, predicted_activities, 's', label = 'Optima')
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel(r'Kinetic Monte Carlo ($r^{KMC}(\sigma)$) ($s^{-1}$)', size=24)
-        plt.ylabel(r'Surrogate ($r^{surr}(\sigma)$) ($s^{-1}$)', size=24)
-        plt.legend(loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig(os.path.join(curr_fldr, 'structure_parity'), dpi = 600)
-        plt.close()
-        
-        # Terminate if the KMC is the best it has ever been and was accurately predicted by teh surrogate
+        # Terminate if the KMC is the best it has ever been and was accurately predicted by the surrogate

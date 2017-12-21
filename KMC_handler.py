@@ -104,7 +104,7 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         iter_fldr = os.path.join(scale_parent_fldr, 'Iteration_' + str(iteration))
         if not os.path.exists(iter_fldr):
             os.makedirs(iter_fldr)
-            
+        
         # Create object for batch
         cur_batch = zw.Replicates()
         cur_batch.ParentFolder = iter_fldr
@@ -147,7 +147,7 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         
         # Run jobs and read output
         cur_batch.BuildJobFiles(init_states = initial_states)
-        cur_batch.RunAllTrajectories_JobArray(server = 'Squidward', job_name = j_name )  
+        cur_batch.RunAllTrajectories_JobArray(server = 'Squidward', job_name = j_name + '_' + str(iteration) )  
         cur_batch.ReadMultipleRuns()
         
         if iteration == 1:
@@ -202,14 +202,16 @@ def steady_state_rescale(kmc_input_fldr, scale_parent_fldr, exe_file, product, n
         
         cur_batch.AverageRuns()
         cur_batch.runAvg.PlotElemStepFreqs()
-        scaledown_data = ProcessStepFreqs(cur_batch.runAvg)         # compute change in scaledown factors based on simulation result
-        delta_sdf = scaledown_data['delta_sdf']
         
-        # Update scaledown factors
-        for ind in range(len(SDF_vec)):
-            SDF_vec[ind] = SDF_vec[ind] * delta_sdf[ind]
+        if include_stiff_reduc:
+            scaledown_data = ProcessStepFreqs(cur_batch.runAvg)         # compute change in scaledown factors based on simulation result
+            delta_sdf = scaledown_data['delta_sdf']
             
-        scale_final_time = np.max( [1.0/np.min(delta_sdf), ss_inc] )
+            # Update scaledown factors
+            for ind in range(len(SDF_vec)):
+                SDF_vec[ind] = SDF_vec[ind] * delta_sdf[ind]
+                
+            scale_final_time = np.max( [1.0/np.min(delta_sdf), ss_inc] )
         
         prev_batch = copy.deepcopy(cum_batch)
         iteration += 1
@@ -338,7 +340,7 @@ def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
     Fill in the rows of atoms that are present
     '''
     
-    d_cut = 0.1     # Matches are not found if we lower this to 0.01
+    d_cut = 0.1     # Disctance cutoff to match KMC lattice sites to atoms
     
     mol_cart_coords = cat.atoms_template.get_positions()[:, 0:2:]
 
