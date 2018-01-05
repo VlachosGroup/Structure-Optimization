@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from sklearn import tree
 from sklearn.neural_network import MLPClassifier
 from sklearn.neural_network import MLPRegressor
-from NH3.NiPt_NH3_simple import NiPt_NH3_simple
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import pickle
@@ -21,7 +20,7 @@ class surrogate(object):
 
     def __init__(self):
         
-        self.classifier = None              # Decision tree for classifying sites as active or inactive
+        self.cat = None
         self.predictor = None               # Neural network for predicting the activity of active sites
             
         self.all_syms = None                # All rotations and translations of training structure
@@ -55,79 +54,7 @@ class surrogate(object):
                 return np.sum( site_rates )
 
     
-    def train_decision_tree_regressor(self,site_rates):
-        '''
-        Try doing all regression with decision tree instead
-        '''
-        
-        
-        plt.hist(self.Y_reg)
-        plt.xlabel('Rate (s^-1)', size=24)
-        plt.ylabel('Frequency', size=24)
-        plt.xticks(size=20)
-        plt.yticks(size=20)
-        plt.tight_layout()
-        plt.savefig('site_rate_hist')
-        plt.close()
-        raise NameError('stop')
-        # Duplicate site rates for each rotation
-        #site_rates_flat = site_rates.flatten()
-        #y = np.tile(site_rates_flat,[3,1])
-        #site_rates_flat = np.transpose(y).flatten()
-        #y_max = np.max(site_rates_flat)
-        #
-        #X = self.all_syms
-        #Y = site_rates_flat / y_max
-        
-        y_max = np.max(self.Y_reg)
-        X = self.X_reg
-        Y = self.Y_reg / y_max
-        
-        dtr = tree.DecisionTreeRegressor(max_depth=15)#(max_leaf_nodes=150)
-        X_train, X_test, y_train, y_test = train_test_split(X, Y, random_state=0)
-        dtr.fit(X_train, y_train)
-        predictions_train = y_max * dtr.predict(X_train)
-        predictions_test = y_max * dtr.predict(X_test)
-        y_train_raw = y_max * y_train
-        y_test_raw = y_max * y_test
-        
-        # Print information
-        print dtr.tree_.node_count
-        print dtr.tree_.children_left
-        print dtr.tree_.children_right
-        print dtr.tree_.feature
-        print dtr.tree_.threshold
-        
-        '''
-        Plot parity
-        '''
-        
-        mat.rcParams['mathtext.default'] = 'regular'
-        mat.rcParams['text.latex.unicode'] = 'False'
-        mat.rcParams['legend.numpoints'] = 1
-        mat.rcParams['lines.linewidth'] = 2
-        mat.rcParams['lines.markersize'] = 12
-        
-        plt.figure()
-        all_point_values = np.hstack([y_train_raw, y_test_raw, predictions_train, predictions_test])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '--', color = 'k')
-        plt.plot(y_train_raw, predictions_train, 'o', color = 'b', label = 'train')
-        plt.plot(y_test_raw, predictions_test, 'o', color = 'r', label = 'test')
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel('Kinetic Monte Carlo', size=24)
-        plt.ylabel('Neural network', size=24)
-        plt.legend(loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig('decision_tree_fit', dpi = 600)
-        plt.close()
-        
-        raise NameError('stop')
-    
-    def partition_data_set(self,site_rates):
+    def partition_data_set(self, site_rates, cat):
         
         '''
         Split the data set into active and inactive sites
@@ -138,8 +65,7 @@ class surrogate(object):
         y = np.tile(site_rates_flat,[3,1])
         site_rates_flat = np.transpose(y).flatten()
         y_max = np.max(site_rates_flat)
-        active_cut = 0.005
-        
+        print y_max
         if y_max == 0.:
             raise NameError('No active sites in database.')
         
@@ -148,14 +74,21 @@ class surrogate(object):
         self.site_is_active = np.zeros(len(site_rates_flat))
         for index in range(len(site_rates_flat)):
             
-                if site_rates_flat[index] > active_cut * y_max :
+                #if cat.is_edge(self.all_syms[index,:]) :
+                #if self.all_syms[index,0] == 3:
+                #if self.all_syms[index,0] == 3 and site_rates_flat[index] > 0.06 * y_max:
+                #if self.all_syms[index,24] == 3 and site_rates_flat[index] > 0.06 * y_max:
+                if site_rates_flat[index] > 0.06 * y_max:
                     self.X_reg.append( self.all_syms[index,:] )
                     self.Y_reg.append( site_rates_flat[index] )
                     self.site_is_active[index] = 1     # Classify rates as zero or nonzero
     
         self.X_reg = np.array(self.X_reg)
         self.Y_reg = np.array(self.Y_reg)
-        
+        print self.X_reg.shape
+        print self.Y_reg.shape
+        #raise NameError('stop')
+    
     
     def train_classifier(self):    
         
@@ -166,14 +99,14 @@ class surrogate(object):
         :param self.site_is_active: 0 if inactive, 1 if active
         '''
         
-        self.classifier = tree.DecisionTreeClassifier(max_leaf_nodes=50)
-        self.classifier.fit(self.all_syms, self.site_is_active)
-        predictoriction_train = self.classifier.predict(self.all_syms)
-        frac_wrong_train = np.float( np.sum( np.abs( predictoriction_train - self.site_is_active ) ) ) / len(self.site_is_active)
-        print 'Fraction wrong in training set: ' + str(frac_wrong_train)
-        '''
+        #self.classifier = tree.DecisionTreeClassifier(max_leaf_nodes=50)
+        #self.classifier.fit(self.all_syms, self.site_is_active)
+        #predictoriction_train = self.classifier.predict(self.all_syms)
+        #frac_wrong_train = np.float( np.sum( np.abs( predictoriction_train - self.site_is_active ) ) ) / len(self.site_is_active)
+        #print 'Fraction wrong in training set: ' + str(frac_wrong_train)
+        
         # Use this section for choosing hyperparameters
-        self.classifier = tree.DecisionTreeClassifier(max_leaf_nodes=70, random_state=0)
+        self.classifier = tree.DecisionTreeClassifier(max_depth=30, random_state=0)
         #self.classifier = tree.DecisionTreeClassifier(random_state=0)
         X_train, X_test, y_train, y_test = train_test_split(self.all_syms, self.site_is_active, random_state=0)
         self.classifier.fit(X_train, y_train)
@@ -191,13 +124,14 @@ class surrogate(object):
         feature = self.classifier.tree_.feature
         threshold = self.classifier.tree_.threshold
         
-        print n_nodes
-        print children_left
-        print children_right
-        print feature
-        print threshold
+        #print n_nodes
+        #print children_left
+        #print children_right
+        #print feature
+        #print threshold
         raise NameError('stop')
-        '''
+        
+        
     
     def train_regressor(self, reg_parity_fname = None):
         
@@ -205,11 +139,20 @@ class surrogate(object):
         Train a neural network to predict site rates
         '''
 
+        plt.hist(self.Y_reg)
+        plt.xlabel('Rate (s^-1)', size=24)
+        plt.ylabel('Frequency', size=24)
+        plt.xticks(size=20)
+        plt.yticks(size=20)
+        plt.tight_layout()
+        plt.savefig('site_rate_hist')
+        plt.close()
+        #raise NameError('stop')
         # Scale Y
         self.Y_scaler = StandardScaler(with_mean = True, with_std = True)
         self.Y_scaler.fit(self.Y_reg.reshape(-1,1))
         Y = self.Y_scaler.transform(self.Y_reg.reshape(-1,1))
-        Y = Y.reshape(-1,1)
+        Y = Y.flatten()
         
         '''
         Train neural network - Regression
@@ -225,9 +168,10 @@ class surrogate(object):
         #print 'Mean absolute error: ' + str(mae)
         
         # Use this section for choosing hyperparameters
-        
-        self.predictor = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.0001,
-                        alpha = 1.0, hidden_layer_sizes = (30,), max_iter=10000, tol=0.00001)
+        print self.X_reg
+        self.predictor = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.0001, momentum=0.7,
+                        alpha = 1.0, hidden_layer_sizes = (20,), max_iter=10000, tol=0.000001)
+        #self.predictor = tree.DecisionTreeRegressor(max_depth=10)
         X_train, X_test, y_train, y_test = train_test_split(self.X_reg, Y, random_state=0)
         y_train_raw = self.Y_scaler.inverse_transform(y_train)
         y_test_raw = self.Y_scaler.inverse_transform(y_test)
@@ -243,6 +187,16 @@ class surrogate(object):
         y_test_raw = y_test_raw.reshape(-1)
         mae = np.mean( np.abs( predictions_test - y_test_raw ) )
         print 'Mean absolute error (test): ' + str(mae)
+        
+        print str(len(y_train_raw)) + ' data points in training set'
+        print str(len(y_test_raw)) + ' data points in test set'
+        
+        # Print information
+        #print dtr.tree_.node_count
+        #print dtr.tree_.children_left
+        #print dtr.tree_.children_right
+        #print dtr.tree_.feature
+        #print dtr.tree_.threshold
         
         mat.rcParams['mathtext.default'] = 'regular'
         mat.rcParams['text.latex.unicode'] = 'False'

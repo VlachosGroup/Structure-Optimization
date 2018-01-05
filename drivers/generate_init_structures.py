@@ -4,22 +4,24 @@ Create random structures for the initial database
 
 import sys
 sys.path.append('/home/vlachos/mpnunez/Github/Zacros-Wrapper')
-sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization')
+sys.path.append('/home/vlachos/mpnunez/Github/Structure-Optimization/')
 sys.path.append('/home/vlachos/mpnunez/python_packages/ase')
 sys.path.append('/home/vlachos/mpnunez/python_packages/sklearn/lib/python2.7/site-packages')
 
 import os
 import shutil
 import numpy as np
-
 import random
 import time
 from multiprocessing import Pool
-
-from NH3.NiPt_NH3 import NiPt_NH3
-from KMC_handler import *
-
 from mpi4py import MPI      # MPI parallelization
+
+import zacros_wrapper as zw
+from OML.NiPt_NH3 import *
+from OML.toy_cat import *
+from OML.KMC_handler import *
+from OML.train_surrogate import *
+from OML.optimize_SA import *
 
 def make_random_structure(i, n_strucs, cat, fldr_name):
 
@@ -38,12 +40,30 @@ def make_random_structure(i, n_strucs, cat, fldr_name):
     np.random.seed(i)
     cat.variable_occs = [0 for j in range(cat.atoms_per_layer)]
     n_tops = int( (3 + 15 * float(i) / (n_strucs+1)))
+    #n_tops = 0 # testing
     top_sites = np.random.choice( range(len(cat.variable_atoms)), size=n_tops, replace=False )
     
     for i in top_sites:     # Pick a site to build an island around
         
         sym_inds = cat.var_ind_to_sym_inds(i)
         
+        # Small island
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0], sym_inds[1])
+        #cat.variable_occs[ind1] = 1
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0] - 1, sym_inds[1] + 1)
+        #cat.variable_occs[ind1] = 1
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0], sym_inds[1] + 1)
+        #cat.variable_occs[ind1] = 1
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0] - 1, sym_inds[1])
+        #cat.variable_occs[ind1] = 1
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0] + 1, sym_inds[1])
+        #cat.variable_occs[ind1] = 1
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0], sym_inds[1] - 1)
+        #cat.variable_occs[ind1] = 1
+        #ind1 = cat.sym_inds_to_var_ind(sym_inds[0] + 1, sym_inds[1] - 1)
+        #cat.variable_occs[ind1] = 1
+        
+        # Big island
         ind1 = cat.sym_inds_to_var_ind(sym_inds[0] - 2, sym_inds[1] + 2)
         cat.variable_occs[ind1] = 1
         ind1 = cat.sym_inds_to_var_ind(sym_inds[0] - 1, sym_inds[1] + 2)
@@ -87,6 +107,14 @@ def make_random_structure(i, n_strucs, cat, fldr_name):
         ind1 = cat.sym_inds_to_var_ind(sym_inds[0] +2, sym_inds[1] - 2)
         cat.variable_occs[ind1] = 1
     
+    n_mutate = 16
+    mutate_sites = np.random.choice( range(len(cat.variable_atoms)), size=n_mutate, replace=False )
+    for site in mutate_sites:
+        if cat.variable_occs[site] == 1:
+            cat.variable_occs[site] = 0
+        elif cat.variable_occs[site] == 0:
+            cat.variable_occs[site] = 1
+    
     # Build catalyst structure
     cat.occs_to_atoms()
     cat.occs_to_graph()
@@ -99,12 +127,10 @@ def make_random_structure(i, n_strucs, cat, fldr_name):
 if __name__ == '__main__': 
     
     ''' User input '''
-    n_strucs = 32
-    cat = NiPt_NH3()
-    DB_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_DB'
+    n_strucs = 48
+    cat = toy_cat()
+    DB_fldr = '/home/vlachos/mpnunez/OML_data/AB_data_5/KMC_DB'
     ''' '''
-    
-    
     
     # Run in parallel
     COMM = MPI.COMM_WORLD

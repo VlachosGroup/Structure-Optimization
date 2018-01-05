@@ -110,33 +110,7 @@ class NiPt_NH3(dynamic_cat):
                 self.variable_occs[i] = 0
             else:
                 raise NameError('Invalid element type in graph for variable atom.')
-                
-    
-    def get_site_data(self):
-        '''
-        Evaluate the contribution to the current from each site
-        
-        :returns: Array site currents for each active site, 3 columns for 3 sites per atom (top, fcc hollow, hcp hollow)
-        NEED TO IMPLEMENT THIS
-        ''' 
-        site_data = np.zeros([self.atoms_per_layer,3])
-        
-        for i in range(len(self.variable_occs)):
- 
-            neighb_dict = self.defected_graph[self.variable_atoms[i]]
-            n_Ni_neighbs = 0
-            n_vac_neighbs = 0
-            for key in neighb_dict:
-                if self.defected_graph.node[key]['element'] == 'Ni':
-                    n_Ni_neighbs += 1
-                elif self.defected_graph.node[key]['element'] == 'vacancy':
-                    n_vac_neighbs += 1
-            
-            if self.defected_graph.node[self.variable_atoms[i]]['element'] == 'Ni':     # Only active if a Ni atom is present
-                site_data[i,0] = n_Ni_neighbs * n_vac_neighbs
-        
-        return site_data
-        
+
     
     def flip_atom(self, ind):
         

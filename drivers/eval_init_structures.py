@@ -15,20 +15,23 @@ import numpy as np
 import random
 import time
 from multiprocessing import Pool
-
-from NH3.NiPt_NH3 import NiPt_NH3
-from KMC_handler import *
-
 from mpi4py import MPI      # MPI parallelization
+
+import zacros_wrapper as zw
+from OML.NiPt_NH3 import *
+from OML.toy_cat import *
+from OML.KMC_handler import *
+from OML.train_surrogate import *
+from OML.optimize_SA import *
 
 
 if __name__ == '__main__': 
     
     ''' User input '''
-    n_strucs = 16
+    n_strucs = 48
     cat = NiPt_NH3()
-    DB_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_DB'
-    kmc_input_fldr = '/home/vlachos/mpnunez/OML_data/NH3_data_2/KMC_input'
+    DB_fldr = '/home/vlachos/mpnunez/OML_data/AB_data_5/KMC_DB'
+    kmc_input_fldr = '/home/vlachos/mpnunez/OML_data/AB_data_5/KMC_input'
     exe_file = '/home/vlachos/mpnunez/bin/zacros_ML.x'
     ''' '''
     
@@ -54,11 +57,14 @@ if __name__ == '__main__':
     # Make sure to not use super big objects in there as they will be pickled to be
     # exchanged over MPI.
     for job in jobs:
-        cum_reps = steady_state_rescale(kmc_input_fldr, job, exe_file, 'N2', n_runs = 5, n_batches = 1000, 
-                                prod_cut = 1000, include_stiff_reduc = True, max_events = int(1e3), 
-                                max_iterations = 20, ss_inc = 1.0, n_samples = 100,
-                                rate_tol = 0.05)
+        struc_name = os.path.basename(os.path.normpath(job))
+        struc_name = struc_name[-5:]
+        cum_reps = steady_state_rescale(kmc_input_fldr, job, exe_file, 'N2', n_runs = 10, n_batches = 1000, 
+                                prod_cut = 1500, include_stiff_reduc = False, max_events = int(1e3), 
+                                max_iterations = 15, ss_inc = 1.0, n_samples = 100,
+                                rate_tol = 0.05, j_name = struc_name)
         
         cum_reps.runAvg.lat.Read_lattice_output( os.path.join(job,'Iteration_1','1') )
-        site_rates = compute_site_rates(cat, cum_reps, gas_prod = 'N2', gas_stoich = 1)
+        cum_reps.AverageRuns()
+        site_rates = compute_site_rates(cat, cum_reps.runAvg, gas_prod = 'N2', gas_stoich = 1)
         np.save(os.path.join(job, 'site_rates.npy'), site_rates)

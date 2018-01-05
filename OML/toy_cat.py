@@ -10,14 +10,13 @@ from dynamic_cat import dynamic_cat
 from zacros_wrapper.Lattice import Lattice as lat
 
 
-class NiPt_NH3_simple(dynamic_cat):
+class toy_cat(dynamic_cat):
     
     '''
-    Handles a dynamic lattice for Wei's NH3 decomposition model
-    Data taken from W. Guo and D.G. Vlachos, Nat. Commun. 6, 8619 (2015).
+    Toy model with a very simple KMC lattice
     '''
     
-    def __init__(self, dimen = 12):
+    def __init__(self, dimen = 16):
         
         '''
         Modify the template atoms object and build defected graph
@@ -109,76 +108,7 @@ class NiPt_NH3_simple(dynamic_cat):
             elif self.defected_graph.node[self.variable_atoms[i]]['element'] == 'vacancy':
                 self.variable_occs[i] = 0
             else:
-                raise NameError('Invalid element type in graph for variable atom.')
-                
-    
-    def get_site_data(self):
-        '''
-        Evaluate the contribution to the current from each site
-        
-        :returns: Array site currents for each active site, 3 columns for 3 sites per atom (top, fcc hollow, hcp hollow)
-        NEED TO IMPLEMENT THIS
-        ''' 
-        site_data = np.zeros([self.atoms_per_layer,3])
-        
-        for i in range(len(self.variable_occs)):
- 
-            neighb_dict = self.defected_graph[self.variable_atoms[i]]
-            n_Ni_neighbs = 0
-            n_vac_neighbs = 0
-            for key in neighb_dict:
-                if self.defected_graph.node[key]['element'] == 'Ni':
-                    n_Ni_neighbs += 1
-                elif self.defected_graph.node[key]['element'] == 'vacancy':
-                    n_vac_neighbs += 1
-            
-            if self.defected_graph.node[self.variable_atoms[i]]['element'] == 'Ni':     # Only active if a Ni atom is present
-                site_data[i,0] = n_Ni_neighbs * n_vac_neighbs
-        
-        return site_data
-        
-    
-    def flip_atom(self, ind):
-        
-        '''
-        ind: Index of the site to change.
-        If it is a Ni, change it to a vacancy.
-        If it is a vacancy, change it to Ni.
-        '''  
-        super(NiPt_NH3_simple, self).flip_atom(ind)     # Call super class method to change the occupancy vector
-        
-        isos_removed = []
-        element_from = self.defected_graph.node[ind]['element'] 
-        
-        if element_from == 'vacancy':
-            
-            self.defected_graph.node[ind]['element'] = 'Ni'
-            self.atoms_missing[ind] = False
-            
-        elif element_from == 'Ni':
-            
-            self.defected_graph.node[ind]['element'] = 'vacancy'
-            self.atoms_missing[ind] = True
-                
-        else:
-            print element_from
-            raise NameError('Flipped atoms must be Ni or a vacancy.')
-            
-        # Remove isomorphisms which have site ind as the old property
-        for isom in self.target_isos:
-            if ind in isom:
-                if x.target_graph.node[ isom[ind] ]['element'] == element_from:     # This should always be true because element matching was imposed in the isomorphism
-                    isos_removed.append(isom)
-                    
-        for isom in isos_removed:
-            self.target_isos.remove(isom)
-
-        # Add new isomorphisms in a neighborhood around site ind
-        neighb = nx.ego_graph(self.defected_graph, ind, radius = self.target_diam)         # Take radius around new node
-        GM4 = iso.GraphMatcher(neighb, x.target_graph, node_match=iso.categorical_node_match('element','Au') )
-        for subgraph in GM4.subgraph_isomorphisms_iter():
-            if ind in subgraph:
-                self.target_isos.append(subgraph)        
+                raise NameError('Invalid element type in graph for variable atom.')   
         
                     
     def graph_to_KMClattice(self):
@@ -195,19 +125,10 @@ class NiPt_NH3_simple(dynamic_cat):
         for i in range(n_at):           # Set all site types as unknown
             self.defected_graph.node[i]['site_type'] = None
         
-        # Prepare a tetrahedron graph which will be useful
-        tet_graph = nx.Graph() 
-        tet_graph.add_nodes_from(['A', 'B', 'C', 'D'])
-        tet_graph.add_edges_from([['A','B'], ['B','C'], ['C','A'], ['A', 'D'], ['B', 'D'], ['C', 'D']])
         
         '''
         Add site types one by one
         '''
-        
-        # 4. Ni corner
-        for i in range(n_at):
-            if self.defected_graph.node[i]['element'] == 'Ni':   # Ni atoms not defined as sites  
-                self.defected_graph.node[i]['site_type'] = 2
         
         
         # 3. Ni_top
@@ -238,19 +159,15 @@ class NiPt_NH3_simple(dynamic_cat):
             inv_map = {v: k for k, v in subgraph.items()}
             A_ind = inv_map['A']
             
-            # count the number of neighbors that are Ni edge sites
+            # count the number of neighbors that are Ni atoms
             n_Ni_neighbs = 0                 
             for neighb in self.defected_graph.neighbors(A_ind):               # look though the neighbors of the Ni atom (1)
                 if self.defected_graph.node[neighb]['element'] == 'Ni':
                     n_Ni_neighbs += 1
                     
             if n_Ni_neighbs == 4:
-                self.defected_graph.node[A_ind]['site_type'] = 3
+                self.defected_graph.node[A_ind]['site_type'] = 2
         
-        
-
-        
-            
             
         '''
         Build KMC lattice
@@ -261,31 +178,16 @@ class NiPt_NH3_simple(dynamic_cat):
         self.KMC_lat.text_only = False
         self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
         
-        # Wei Nature site names
-        #self.KMC_lat.site_type_names = ['Ni_fcc', 'Ni_hcp', 'Ni_top', 'Ni_corner', 'Ni_edge', 'Pt_fcc', 'Pt_hcp', 
-        #    'Pt_top', 'h5', 'f3', 'f4', 'h4', 'h6', 's2', 's1', 'f1', 'f2', 'h1', 'h2']
-            
-        # Older site names
-        #self.KMC_lat.site_type_names = ['fcc_Ni',	'hcp_Ni',	'top_Ni',	'top_corner_Ni',	'top_edge_Ni',	'fcc_Pt',
-        #'hcp_Pt',	'top_Pt', 'hcp_2edge_Pt_3fcc',	'fcc_edge_Pt_3fcc',	'fcc_edge_Pt_3hcp',	'hcp_edge_Pt_3fcc',	'hcp_edge_Pt_3hcp',
-        #    'step_100',	'step_110',	'fcc_edge_Ni_3fcc',	'fcc_edge_Ni_3hcp',	'hcp_edge_Ni_3fcc',	'hcp_edge_Ni_3hcp']
-        
-        self.KMC_lat.site_type_names = ['top_Ni',	'top_corner_Ni',	'top_edge_Ni']
+        self.KMC_lat.site_type_names = ['top_Ni', 'top_edge_Ni']
         
         # All atoms with a defined site type
         cart_coords_list = []
+        self.var_ind_kmc_sites = []
         for i in range(n_at):
-            #if not self.defected_graph.node[i]['site_type'] is None:
-            if self.defected_graph.node[i]['site_type'] in [1,2,3]:
+            if not self.defected_graph.node[i]['site_type'] is None:
                 self.KMC_lat.site_type_inds.append(self.defected_graph.node[i]['site_type'])
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
+                self.var_ind_kmc_sites.append(i-3*self.atoms_per_layer)
         
         self.KMC_lat.set_cart_coords(cart_coords_list)
         self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)
-            
-            
-    def show(self, fname = 'structure_1', fmat = 'png', transmute_top = False, chop_top = False):
-        '''
-        Use super class method with top layer transmuted to display
-        '''
-        super(NiPt_NH3_simple, self).show(fname = fname, fmat = fmat, chop_top = chop_top)

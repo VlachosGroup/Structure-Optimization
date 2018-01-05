@@ -44,6 +44,7 @@ def write_structure_files(cat, run_folder, all_symmetries = None, clear_fldr = F
     # Molecular pictures of catalyst structure
     cat.show(fname = os.path.join(run_folder,'structure'), fmat = 'png')
     cat.show(fname = os.path.join(run_folder,'structure'), fmat = 'xsd')
+    print os.path.join(run_folder,'structure')
     
     # Picture of KMC lattice
     kmc_lat = cat.KMC_lat.PlotLattice()
@@ -299,7 +300,7 @@ def read_scaledown(RunPath):        # Need to add option for no scaledown
     return cum_batch
     
     
-def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
+def compute_site_rates(cat, avg_traj, gas_prod = 'N2', gas_stoich = 1):
     
     '''
     Read structure occupancies and site propensities from a KMC folder
@@ -310,14 +311,14 @@ def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
     :returns: 1-D numpy array of site rates
     '''
     
-    kmc_reps.AverageRuns()
-    avg_traj = kmc_reps.runAvg
     
-    if kmc_reps.runAvg.lat.text_only == True:
+    
+    if avg_traj.lat.text_only == True:
         raise NameError('lattice_output.dat has not been read')
     
     n_rxns = len( avg_traj.genout.RxnNameList )
     site_props_ss = np.zeros( [cat.atoms_per_layer, n_rxns] )
+    site_types = np.zeros( cat.atoms_per_layer )
     
     '''
     Identify stoichiometries
@@ -366,7 +367,10 @@ def compute_site_rates(cat, kmc_reps, gas_prod = 'N2', gas_stoich = 1):
             
         if match_found:
             site_props_ss[defect_ind,:] = avg_traj.TS_site_props_ss[i,:]    
+            site_types[defect_ind] = avg_traj.lat.site_type_inds[i]
     
     site_rates = np.matmul( site_props_ss, TOF_stoich ) / gas_stoich
     
-    return site_rates
+    site_types_all_syms = cat.generate_all_translations_and_rotations(old_vec = site_types)
+    
+    return site_rates, site_types_all_syms

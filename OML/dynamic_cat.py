@@ -39,7 +39,6 @@ class dynamic_cat(object):
         self.defected_graph = None                      # graph which helps compute things, implemented in subclasses
         self.atom_last_moved = None                     # Index of the variable atom last changed, used to revert moves in simulated annealing
         
-        
         '''
         Build the template atoms object as a slab
         '''        
@@ -246,7 +245,7 @@ class dynamic_cat(object):
         return np.array(all_translations)
 
         
-    def translate(self, shift1, shift2):
+    def translate(self, shift1, shift2, old_vec = None):
         '''
         Permute occupancies according to symmetry
         
@@ -255,29 +254,35 @@ class dynamic_cat(object):
         :param shift2: Number of indices to translate downward along second axis
         '''
         
+        if old_vec is None:
+            old_vec = self.variable_occs
+        
         n_var = len(self.variable_atoms)
-        new_occs = np.zeros(n_var)
+        new_vec = np.zeros(n_var)
         for var_ind in range(n_var):
             d1, d2 = self.var_ind_to_sym_inds(var_ind)
             map_from_ind = self.sym_inds_to_var_ind( d1 + shift1 , d2 + shift2 )
-            new_occs[var_ind] = self.variable_occs[ map_from_ind ]
+            new_vec[var_ind] = old_vec[ map_from_ind ]
                 
-        return new_occs
+        return new_vec
         
     
-    def generate_all_translations_and_rotations(self):
+    def generate_all_translations_and_rotations(self, old_vec = None):
         
-        all_translations = []
+        if old_vec is None:
+            old_vec = self.variable_occs
+        
+        all_symmetries = []
         n_var = len(self.variable_atoms)
         
         for var_ind in range(n_var):
             d1, d2 = self.var_ind_to_sym_inds(var_ind)
-            translated = self.translate( d1, d2)
+            translated = self.translate( d1, d2, old_vec = old_vec)
             
             for angle in [0,1,2]:
-                all_translations.append( self.rotate( angle, old_occs = translated ) )
+                all_symmetries.append( self.rotate( angle, old_occs = translated ) )
 
-        return np.array(all_translations)
+        return np.array(all_symmetries)
     
     
     def rotate(self, i, old_occs = None):
@@ -328,9 +333,8 @@ class dynamic_cat(object):
         
         n_var = len(self.variable_atoms)
         new_occs = []
-        for var_ind in range(n_var):
-            d1, d2 = self.var_ind_to_sym_inds(var_ind)
-            if np.abs(d1) <= 3 and np.abs(d2) <= 3:
+        for d2 in range(-3,4):
+            for d1 in range(-3,4):
                 map_from_ind = self.sym_inds_to_var_ind( d1 + shift1 , d2 + shift2 )
                 new_occs.append(map_from_ind)
                 
@@ -393,3 +397,5 @@ class dynamic_cat(object):
             write(fname + '.xsd', self.atoms_defected, format = fmat )
         elif fmat == 'povray':
             write(fname + '.pov', self.atoms_defected )
+        else:
+            raise NameError('wrong format to show catalyst')   

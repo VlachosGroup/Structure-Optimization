@@ -1,5 +1,5 @@
 '''
-Driver for the online learning program
+Driver for the online machine learning program
 '''
 
 import sys
@@ -10,31 +10,24 @@ sys.path.append('/home/vlachos/mpnunez/python_packages/sklearn/lib/python2.7/sit
 
 import os
 import pickle
-
-from multiprocessing import Pool
-from NH3.NiPt_NH3 import NiPt_NH3
-from NH3.NiPt_NH3_simple import NiPt_NH3_simple
-import zacros_wrapper as zw
-
 import matplotlib as mat
 import matplotlib.pyplot as plt
-
-# functions
-from KMC_handler import *
-from train_surrogate import surrogate
-from optimize_SA import *
-
+from multiprocessing import Pool
 from mpi4py import MPI      # MPI parallelization
 
+import zacros_wrapper as zw
+from OML.NiPt_NH3 import *
+from OML.toy_cat import *
+from OML.KMC_handler import *
+from OML.train_surrogate import *
+from OML.optimize_SA import *
 
-def read_database(db_fldr):
+
+def read_database(fldr_list):
     '''
     Read all data in the database from structures that are finished
-    :param db_fldr: Directory of the KMC database
-    '''
-    
-    # List folders in the database directory
-    fldr_list = [os.path.join(db_fldr, o) for o in os.listdir(db_fldr) if os.path.isdir(os.path.join(db_fldr,o))]
+    :fldr_list: List of folders that possibly have data
+    '''  
     
     structures_evaluated = []
     sym_list = []
@@ -44,6 +37,7 @@ def read_database(db_fldr):
         if os.path.isfile(os.path.join(fldr, 'site_rates.npy')):        # skip incomplete calculations
             structures_evaluated.append(i)
             sym_list.append( np.load(os.path.join(fldr, 'occ_symmetries.npy')) )
+            #sym_list.append( np.load(os.path.join(fldr, 'site_types_all_syms.npy')) )
             site_rate_list.append( np.load(os.path.join(fldr, 'site_rates.npy')) )
             i += 1
         
@@ -55,7 +49,12 @@ def read_database(db_fldr):
 
 def plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new = None, predicted_activities = None):
     '''
-    Plot surrogate parity
+    :param curr_fldr: Folder in which to print the graph
+    :param Plot surrogate parity: 
+    :param structure_rates_KMC: training y data
+    :param structure_rates_NN: training y prediction
+    :param structure_rates_KMC_new: test y data
+    :param predicted_activities: test y prediction
     '''
 
     mat.rcParams['mathtext.default'] = 'regular'
@@ -89,35 +88,27 @@ def plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN, structure_ra
 if __name__ == '__main__':
 
     '''
-    Main method for online machine learning
-    '''
-
-    '''
     User input
     '''
     
     # Calculation size
-    gen_size = 16               # number of processors on one node
     n_kmc_reps = 5              # Number of replicate trajectories per KMC evaluation
-    max_iterations = 10
+    max_iterations = 10         # Maximum number of iterations for the online machine learning
     
     # Directories
-    main_fldr = '/home/vlachos/mpnunez/OML_data/NH3_lumped'
+    main_fldr = '/home/vlachos/mpnunez/OML_data/NH3_lumped_2'
     DB_fldr = os.path.join(main_fldr, 'KMC_DB')
     kmc_input_fldr = os.path.join(main_fldr, 'KMC_input')
     exe_file = '/home/vlachos/mpnunez/bin/zacros_ML.x'
     structure_proc = NiPt_NH3()                     # structure for this processor
 
-    '''
-    Initialize new structures
-    '''
-    
-    sys.setrecursionlimit(1500)             # Needed for large number of atoms
-    
     # Run in parallel
     COMM = MPI.COMM_WORLD
     COMM.Barrier()
-
+    gen_size = COMM.Get_size()
+    
+    # Initialize new structures
+    sys.setrecursionlimit(1500)             # Needed for large number of atoms
     structure_proc.randomize(coverage = 0.5)        # randomize the occupancies
 
     
@@ -132,7 +123,8 @@ if __name__ == '__main__':
         '''
         
         # Read database
-        db_info = read_database(DB_fldr)
+        db_fldr_list = [os.path.join(DB_fldr, o) for o in os.listdir(DB_fldr) if os.path.isdir(os.path.join(DB_fldr,o))]
+        db_info = read_database(db_fldr_list)
         structure_occs = db_info[0]
         site_rates = db_info[1]
         
@@ -144,7 +136,7 @@ if __name__ == '__main__':
         Make folder for the new structure
         '''
         
-        curr_fldr = os.path.join(DB_fldr, 'structure_' + str(iteration) + '_' + str(COMM.rank) )
+        curr_fldr = os.path.join(DB_fldr, 'structure_' + str(COMM.rank) + '_' + str(iteration) )
         
         if not os.path.exists(curr_fldr ):
             os.makedirs(curr_fldr )
@@ -165,13 +157,28 @@ if __name__ == '__main__':
         Train the surrogate model
         '''
         
+        # Change the indexing of site types
+        #s = structure_occs.shape
+        #for ind1 in range(s[0]):
+        #    for ind2 in range(s[1]):
+        #        if structure_occs[ind1, ind2] == 3:
+        #            structure_occs[ind1, ind2] = 1
+        #        elif structure_occs[ind1, ind2] == 2:
+        #            structure_occs[ind1, ind2] = -1
+                
+        # Only use local site occupancies
+        print structure_occs.shape
+        structure_occs = structure_occs[:,structure_proc.get_local_inds()]
+        print structure_occs[-1,:]
+        #raise NameError('stop')
+        
         surr = surrogate()
         surr.all_syms = structure_occs
-        surr.partition_data_set(site_rates)
-        surr.train_decision_tree_regressor(site_rates)
+        surr.partition_data_set(site_rates, structure_proc)
+        #surr.train_decision_tree_regressor(site_rates)
         #surr.partition_data_set(site_rates)
-        #surr.train_classifier()
-        #surr.train_regressor(reg_parity_fname = os.path.join( curr_fldr , 'site_parity'))
+        surr.train_classifier()
+        surr.train_regressor(reg_parity_fname = os.path.join( curr_fldr , 'site_parity'))
 
         '''
         Evaluate structures in the training set with the surrogate model
@@ -213,7 +220,8 @@ if __name__ == '__main__':
                             rate_tol = 0.05, j_name = 'struc_' + str(iteration) + '_' + str(COMM.rank) )
         
         cum_reps.runAvg.lat.Read_lattice_output( os.path.join(curr_fldr,'Iteration_1','1') )            
-        site_rates_onestruc = compute_site_rates(structure_proc, cum_reps, gas_prod = 'N2', gas_stoich = 1)
+        cum_reps.AverageRuns()
+        site_rates_onestruc = compute_site_rates(structure_proc, cum_reps.runAvg, gas_prod = 'N2', gas_stoich = 1)
         np.save(os.path.join(curr_fldr, 'site_rates.npy'), site_rates_onestruc)
                 
     
