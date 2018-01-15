@@ -136,13 +136,16 @@ if __name__ == '__main__':
         Make folder for the new structure
         '''
         
+        # Assign folder name based on processor and iteration
         curr_fldr = os.path.join(DB_fldr, 'structure_' + str(COMM.rank) + '_' + str(iteration) )
         
+        # Make folder for new structure
         if not os.path.exists(curr_fldr ):
             os.makedirs(curr_fldr )
     
         # If this folder has already been created and evaluated, skip to the next iteration...
 
+        # Clear folder contents
         for the_file in os.listdir(curr_fldr ):
             file_path = os.path.join(curr_fldr , the_file)
             try:
@@ -155,25 +158,11 @@ if __name__ == '__main__':
         
         '''
         Train the surrogate model
-        '''
+        '''        
         
-        # Change the indexing of site types
-        #s = structure_occs.shape
-        #for ind1 in range(s[0]):
-        #    for ind2 in range(s[1]):
-        #        if structure_occs[ind1, ind2] == 3:
-        #            structure_occs[ind1, ind2] = 1
-        #        elif structure_occs[ind1, ind2] == 2:
-        #            structure_occs[ind1, ind2] = -1
-                
-        # Only use local site occupancies
-        print structure_occs.shape
-        structure_occs = structure_occs[:,structure_proc.get_local_inds()]
-        print structure_occs[-1,:]
-        #raise NameError('stop')
-        
+        # This needs to be cleaned up. It doesn't make sense to put X as a class variable, but not Y...
         surr = surrogate()
-        surr.all_syms = structure_occs
+        surr.all_syms = structure_occs      
         surr.partition_data_set(site_rates, structure_proc)
         #surr.train_decision_tree_regressor(site_rates)
         #surr.partition_data_set(site_rates)

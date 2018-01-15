@@ -189,5 +189,6 @@ class toy_cat(dynamic_cat):
                 cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
                 self.var_ind_kmc_sites.append(i-3*self.atoms_per_layer)
         
-        self.KMC_lat.set_cart_coords(cart_coords_list)
-        self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)
+        if len(self.KMC_lat.site_type_inds) > 0:
+            self.KMC_lat.set_cart_coords(cart_coords_list)
+            self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)

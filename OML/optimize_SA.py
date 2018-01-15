@@ -140,7 +140,7 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
     plt.savefig(os.path.join(fldr, 'sim_anneal_trajectory'), dpi = 600)
     plt.close()
     
-    # Put a plot of the optimization trajectory in the scaledown folder for each structure
+    # Put a plot of the temperature profile in the scaledown folder for each structure
     np.save(os.path.join(fldr, 'sim_anneal_trajectory.npy'), trajectory)
     
     plt.figure()

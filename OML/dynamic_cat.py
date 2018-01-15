@@ -398,4 +398,40 @@ class dynamic_cat(object):
         elif fmat == 'povray':
             write(fname + '.pov', self.atoms_defected )
         else:
-            raise NameError('wrong format to show catalyst')   
+            raise NameError('wrong format to show catalyst')
+    
+    
+    def calc_weights(self):
+        '''
+        Computes weights for distance metric
+        :returns: Weight vector
+        '''
+        w = np.zeros(len(self.variable_occs))
+        d = self.dim1
+        ref_site_images = [[0,0],[0,d],[d,0],[d,d],[d,-d]]
+        
+        for i in xrange(len(self.variable_occs)):
+            f1,f2 = self.var_ind_to_sym_inds(i)
+            min_moves = []
+            for image in ref_site_images:
+                diff = [f1 - image[0], f2 - image[1], 0]
+                scores = np.zeros(3)
+                scores[0] = np.abs(diff[0]) + np.abs(diff[1])
+                scores[1] = np.abs(diff[0]+diff[1]) + np.abs(-diff[0])
+                scores[2] = np.abs(diff[0]+diff[1]) + np.abs(diff[1])
+                min_moves.append(np.min(scores))
+            
+            nn_shell = min(min_moves)   # nearest neighbor shell that it is in
+            w[i] = np.exp(-2*(nn_shell+1))
+        return w
+        
+    
+def dyn_cat_dist(occs1,occs2,w):
+    '''
+    Distance metric between two defected catalyst sites
+    :param occs1: Ni site occupancies of first catalyst
+    :param occs2: Ni site occupancies of second catalyst
+    :param w: weights for each of the site occupancy differences
+    '''
+    
+    return np.dot( np.abs(occs1 - occs2), w )

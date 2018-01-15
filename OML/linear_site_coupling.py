@@ -23,6 +23,10 @@ def compute_site_rates_lsc(kmc_lat):
     kmc_lat.neighbor_list
     n_sites = len(kmc_lat.site_type_inds)
     
+    # If there are no sites
+    if n_sites == 0:
+        return np.array([])
+    
     A = np.zeros([n_sites,n_sites])
     b = np.zeros(n_sites)
     A_rate = np.zeros([n_sites,n_sites])
