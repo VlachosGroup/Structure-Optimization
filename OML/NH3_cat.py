@@ -10,7 +10,7 @@ from dynamic_cat import dynamic_cat
 from zacros_wrapper.Lattice import Lattice as lat
 
 
-class NiPt_NH3(dynamic_cat):
+class NH3_cat(dynamic_cat):
     
     '''
     Handles a dynamic lattice for Wei's NH3 decomposition model

@@ -422,7 +422,7 @@ class dynamic_cat(object):
                 min_moves.append(np.min(scores))
             
             nn_shell = min(min_moves)   # nearest neighbor shell that it is in
-            w[i] = np.exp(-2*(nn_shell+1))
+            w[i] = np.exp(-2*nn_shell)
         return w
         
     

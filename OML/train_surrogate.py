@@ -31,7 +31,7 @@ class surrogate(object):
         self.Y_scaler = None
         
     
-    def eval_rate(self, all_trans, normalize = False):
+    def eval_structure_rate(self, all_trans, normalize = False):
     
         '''
         Surrogate model using a classifier and regressor
@@ -49,12 +49,27 @@ class surrogate(object):
         else:
             site_rates = self.Y_scaler.inverse_transform( self.predictor.predict( all_trans[active_site_list,:] ) )
             if normalize:
-                return np.sum( site_rates ) / len(site_rates)
+                return np.sum( site_rates ) / len(all_trans)
             else:
                 return np.sum( site_rates )
 
+                
+    def eval_site_rate(self, all_trans, normalize = False):
+        pass
     
-    def partition_data_set(self, site_rates, cat):
+    
+    def train(structure_occs, site_rates, curr_fldr = None):
+        '''
+        Assign data and train models
+        Can use some cleanup
+        '''
+        self.all_syms = structure_occs      
+        self.partition_data_set(site_rates)
+        self.train_classifier()
+        self.train_regressor(reg_parity_fname = os.path.join( curr_fldr , 'site_parity'))
+    
+    
+    def partition_data_set(self, site_rates):
         
         '''
         Split the data set into active and inactive sites
@@ -74,10 +89,6 @@ class surrogate(object):
         self.site_is_active = np.zeros(len(site_rates_flat))
         for index in range(len(site_rates_flat)):
             
-                #if cat.is_edge(self.all_syms[index,:]) :
-                #if self.all_syms[index,0] == 3:
-                #if self.all_syms[index,0] == 3 and site_rates_flat[index] > 0.06 * y_max:
-                #if self.all_syms[index,24] == 3 and site_rates_flat[index] > 0.06 * y_max:
                 if site_rates_flat[index] > 0.06 * y_max:
                     self.X_reg.append( self.all_syms[index,:] )
                     self.Y_reg.append( site_rates_flat[index] )

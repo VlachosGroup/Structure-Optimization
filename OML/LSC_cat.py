@@ -8,15 +8,15 @@ import networkx.algorithms.isomorphism as iso
 
 from dynamic_cat import dynamic_cat
 from zacros_wrapper.Lattice import Lattice as lat
+import time
 
-
-class toy_cat(dynamic_cat):
+class LSC_cat(dynamic_cat):
     
     '''
-    Toy model with a very simple KMC lattice
+    Catalyst with a very simple KMC lattice and linear site coupling (LSC)
     '''
     
-    def __init__(self, dimen = 16):
+    def __init__(self, dimen = 12):
         
         '''
         Modify the template atoms object and build defected graph
@@ -110,11 +110,62 @@ class toy_cat(dynamic_cat):
             else:
                 raise NameError('Invalid element type in graph for variable atom.')   
         
-                    
+
+    def graph_to_KMClattice_V2(self):
+        '''
+        Trying to make a faster implementation, not used yet
+        '''
+        all_syms = self.generate_all_translations_and_rotations()
+        all_trans = all_syms[0:-1:3,:]
+        
+        n_at = len(self.atoms_template)
+        d = self.dim1
+        site_types = [None for i in range(n_at)]
+        
+        for i in range(len(self.variable_occs)):
+            st_ind = i+3*self.atoms_per_layer
+            hep = all_trans[i,[0, 2*d-1, d, 1, d*(d-1)+1, d*(d-1), d-1]]
+            if np.sum(hep) == 7:
+                site_types[st_ind] = 1      # terrace
+            elif np.sum(hep) == 5:              # might be an edge
+                site_types[st_ind] = 1      # terrace
+            # otherwise, it is neigher a terrace nor edge site
+            
+        
+        
+        '''
+        Build KMC lattice
+        '''
+        
+        # Set up object KMC lattice
+        self.KMC_lat = lat()
+        self.KMC_lat.text_only = False
+        self.KMC_lat.lattice_matrix = self.atoms_template.get_cell()[0:2, 0:2]
+        
+        
+        self.KMC_lat.site_type_names = ['top_Ni', 'top_edge_Ni']
+        
+        
+        # All atoms with a defined site type
+        cart_coords_list = []
+        self.var_ind_kmc_sites = []
+        for i in range(n_at):
+            if not site_types[i] is None:
+                self.KMC_lat.site_type_inds.append(site_types[i])
+                cart_coords_list.append( self.atoms_template.get_positions()[i, 0:2:] )
+                self.var_ind_kmc_sites.append(i-3*self.atoms_per_layer)
+        t11 = time.time() 
+        if len(self.KMC_lat.site_type_inds) > 0:
+            self.KMC_lat.set_cart_coords(cart_coords_list)
+            self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)
+        t12 = time.time() 
+        print 'Neighbor time: ' + str(t12 -t11)
+    
     def graph_to_KMClattice(self):
     
         '''
         Converts defected graph to a KMC lattice object
+        Should speed this up - It is limiting optimization with the analytical model
         '''
         
         if self.defected_graph is None:
@@ -172,7 +223,7 @@ class toy_cat(dynamic_cat):
         '''
         Build KMC lattice
         '''
-        
+
         # Set up object KMC lattice
         self.KMC_lat = lat()
         self.KMC_lat.text_only = False
@@ -192,3 +243,73 @@ class toy_cat(dynamic_cat):
         if len(self.KMC_lat.site_type_inds) > 0:
             self.KMC_lat.set_cart_coords(cart_coords_list)
             self.KMC_lat.Build_neighbor_list(cut = 2.77 + 0.1)
+       
+    
+    def eval_struc_rate_anal(self,x):
+        '''
+        Evaluate the structure rate analytically
+        :param x: Occupancies
+        :returns: Total structure rate (not normalized)
+        '''
+        self.assign_occs(x)
+        self.graph_to_KMClattice()
+        site_rates_anal = self.compute_site_rates_lsc()
+        return np.sum(site_rates_anal)
+        
+    
+    def compute_site_rates_lsc(self):
+        '''
+        Compute analytical solution to the site rates for a certain catalyst
+        :param kmc_lat: KMC lattice
+        :returns: site rates
+        should make this use sparse matrices
+        '''
+        
+        kmc_lat = self.KMC_lat
+        
+        # Rate constants
+        k_ads_terrace = 1.0
+        k_des_terrace = 1.0
+        k_diff = 1.0
+        k_des_edge = 1.0
+        
+        # Build matrices
+        
+        kmc_lat.site_type_inds
+        kmc_lat.neighbor_list
+        n_sites = len(kmc_lat.site_type_inds)
+        
+        # If there are no sites
+        if n_sites == 0:
+            return np.array([])
+        
+        A = np.zeros([n_sites,n_sites])
+        b = np.zeros(n_sites)
+        A_rate = np.zeros([n_sites,n_sites])
+        
+        for site_ind in range(n_sites):
+            
+            # Adsorption/desorption
+            if kmc_lat.site_type_inds[site_ind] == 1:
+                A[site_ind,site_ind] += -1 * (k_ads_terrace + k_des_terrace)
+                b[site_ind] += -k_ads_terrace
+            elif kmc_lat.site_type_inds[site_ind] == 2:
+                A[site_ind,site_ind] += -1 * k_des_edge
+                A_rate[site_ind,site_ind] = k_des_edge
+            
+            # Diffusion
+            for site_ind_2 in range(n_sites):
+            
+                if [site_ind,site_ind_2] in kmc_lat.neighbor_list or [site_ind_2,site_ind] in kmc_lat.neighbor_list:
+                    A[site_ind,site_ind] += -1 * k_diff
+                    A[site_ind,site_ind_2] += k_diff
+        
+        # Solve linear system of equations for the coverages
+        theta = np.linalg.solve(A, b)
+        kmc_site_rates = A_rate.dot(theta)
+        
+        site_rates = np.zeros(len(self.variable_occs))
+        for i in range(len(kmc_site_rates)):
+            site_rates[self.var_ind_kmc_sites[i]] = kmc_site_rates[i]
+            
+        return site_rates

@@ -8,14 +8,16 @@ import os
 import matplotlib as mat
 import matplotlib.pyplot as plt
 
-def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 'exp', fldr = None):
+def optimize(cat, mode = 'surrogate', surrogate = None, syms = None, n_cycles = 100, T_0 = 0.05,
+            cooling = 'exp', fldr = None, n_record = 100, prefix = ''):
     
     '''
     Simulated annealing optimization - maximizes the objective function
     
     :param cat: Initial structure
-    :param surrogate: Surrogate model
-    :param syms: All translations of the catalyst structure
+    :param: 'surrogate' to use a surrogate model or 'analytical' to use the analytical solution
+    :param surrogate: Surrogate model, only needed in surrogate mode
+    :param syms: All translations of the catalyst structure, only needed in surrogate mode
     :param n_cycles: Multiple by the number of Ni sites to get the total number of Metropolis steps
     :param c: Cooling schedule parameter. Should be comparable than the largest possible change in the objective function
     '''
@@ -24,7 +26,6 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
     tau = total_steps / 5.0
     
     # Trajectory recording parameters
-    n_record = 100
     step_rec = np.zeros(n_record+1)
     OF_rec = np.zeros(n_record+1)
     temps = np.zeros(n_record+1)
@@ -34,9 +35,15 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
     
     # Evaluate initial structure
     x = cat.variable_occs
-    if syms is None:
-        syms = cat.generate_all_translations()
-    OF = surrogate.eval_rate( syms )
+    
+    if mode == 'surrogate':
+        if syms is None:
+            syms = cat.generate_all_translations()
+        OF = surrogate.eval_rate( syms )
+    elif mode == 'analytical':
+        OF = cat.eval_struc_rate_anal(x)
+    else:
+        raise NameError('Unrecognized mode for evaluating objective function')
     
     # Record data
     step_rec[record_ind] = 0
@@ -50,7 +57,7 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
     
     
     for step in xrange( total_steps ):
-        
+        print step
         if cooling == 'log':            # Logarithmic cooling schedule
             Metro_temp = T_0 / np.log(step+2)                                                      
         elif cooling == 'exp':         # Exponential cooling schedule
@@ -64,8 +71,8 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
         Random move
         '''
         
+        # Update occupancy vector
         x_new = [i for i in x]
-        syms_new = np.copy(syms)
         ind = random.choice(range(len(x_new)))
     
         if x_new[ind] == 1:
@@ -74,19 +81,30 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
             x_new[ind] = 1
         else:
             raise NameError('Invalid occupancy')
-    
-        d_flip_1, d_flip_2 = cat.var_ind_to_sym_inds(ind)
-        for i in range(len(x)):
-            d1, d2 = cat.var_ind_to_sym_inds(i)
-            ind_to_flip = cat.sym_inds_to_var_ind(d_flip_1 - d1, d_flip_2 - d2)
-            syms_new[i,ind_to_flip] = x_new[ind]
+        
+        # Update occupancy vector symmetries
+        if mode == 'surrogate':
+            syms_new = np.copy(syms)
+            d_flip_1, d_flip_2 = cat.var_ind_to_sym_inds(ind)
+            for i in range(len(x)):
+                d1, d2 = cat.var_ind_to_sym_inds(i)
+                ind_to_flip = cat.sym_inds_to_var_ind(d_flip_1 - d1, d_flip_2 - d2)
+                syms_new[i,ind_to_flip] = x_new[ind]
 
         
         '''
         End random move
         '''
         
-        OF_new = surrogate.eval_rate( syms_new )   # Evaluate the new structure and determine whether or not to accept
+        # Evaluate the objective function for new x
+        
+        if mode == 'surrogate':
+            OF_new = surrogate.eval_rate( syms_new )   # Evaluate the new structure and determine whether or not to accept
+        elif mode == 'analytical':
+            OF_new = cat.eval_struc_rate_anal(x_new)
+        else:
+            raise NameError('Unrecognized mode for evaluating objective function')
+        
         delta_OF = OF_new - OF
         
         if delta_OF > 0:                    # Downhill move
@@ -100,7 +118,8 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
         # Reverse the change if the move is not accepted
         if accept:
             x = x_new
-            syms = syms_new
+            if mode == 'surrogate':
+                syms = syms_new
             OF = OF_new
         
         # Record data
@@ -137,11 +156,11 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
     plt.xlim([trajectory[0,0], trajectory[0,-1]])
     plt.ylim([0, None])
     plt.tight_layout()
-    plt.savefig(os.path.join(fldr, 'sim_anneal_trajectory'), dpi = 600)
+    plt.savefig(os.path.join(fldr, prefix + 'sim_anneal_trajectory'), dpi = 600)
     plt.close()
     
     # Put a plot of the temperature profile in the scaledown folder for each structure
-    np.save(os.path.join(fldr, 'sim_anneal_trajectory.npy'), trajectory)
+    np.save(os.path.join(fldr, prefix + 'sim_anneal_trajectory.npy'), trajectory)
     
     plt.figure()
     plt.plot(trajectory[0,:], temps, '-')
@@ -152,7 +171,7 @@ def optimize(cat, surrogate, syms = None, n_cycles = 100, T_0 = 0.05, cooling = 
     plt.xlim([trajectory[0,0], trajectory[0,-1]])
     plt.ylim([0, None])
     plt.tight_layout()
-    plt.savefig(os.path.join(fldr, 'temperature_profile'), dpi = 600)
+    plt.savefig(os.path.join(fldr, prefix + 'temperature_profile'), dpi = 600)
     plt.close()
     
     #plt.figure()

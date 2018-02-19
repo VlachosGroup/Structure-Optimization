@@ -160,18 +160,11 @@ if __name__ == '__main__':
         Train the surrogate model
         '''        
         
-        # This needs to be cleaned up. It doesn't make sense to put X as a class variable, but not Y...
+        # Regress surrogate model
         surr = surrogate()
-        surr.all_syms = structure_occs      
-        surr.partition_data_set(site_rates, structure_proc)
-        #surr.train_decision_tree_regressor(site_rates)
-        #surr.partition_data_set(site_rates)
-        surr.train_classifier()
-        surr.train_regressor(reg_parity_fname = os.path.join( curr_fldr , 'site_parity'))
-
-        '''
-        Evaluate structures in the training set with the surrogate model
-        '''
+        surr.train(structure_occs, site_rates, curr_fldr = curr_fldr)
+        
+        # Evaluate structures in the training set with the surrogate model
 
         n_training_strucs = len(structure_rates_KMC)
         n_sites = site_rates.shape[1]
@@ -189,13 +182,9 @@ if __name__ == '__main__':
         '''
         
         all_syms = structure_proc.generate_all_translations_and_rotations()
-        optimize( structure_proc, surr, syms = all_syms[::3,:], n_cycles = 500, T_0 = max_site_rate, fldr = curr_fldr)
+        optimize( structure_proc, surrogate = surr, syms = all_syms[::3,:], n_cycles = 500, T_0 = max_site_rate, fldr = curr_fldr)
         
-        
-        '''
-        Write structure information into database folder
-        '''
-
+        # Write structure information into database folder
         structure_proc.graph_to_KMClattice()        # build KMC lattice
         write_structure_files(structure_proc, curr_fldr, all_symmetries = None)
 
