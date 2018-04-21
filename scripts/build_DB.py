@@ -12,17 +12,21 @@ import os
 import numpy as np
 import matplotlib as mat
 import matplotlib.pyplot as plt
+import random
 
 import zacros_wrapper as zw
 import OML
 
-n_structure = 10000
+n_seed = int(sys.argv[1])
+random.seed(a=n_seed)
+n_structure = 100
+#n_structure = 2            # for debugging
 
 occ_DB = None
 KMC_site_type_DB = None
 site_rates_DB = None
 
-# Generate all symmetry indeices
+# Generate all symmetry indices
 cat = OML.LSC_cat()
 site_inds = range(len(cat.variable_atoms))
 site_ind_symms = cat.generate_all_translations_and_rotations(old_vec = site_inds)
@@ -70,7 +74,7 @@ for struc_ind in xrange(n_structure):
     Compute rates
     '''
     site_rates = cat.compute_site_rates_lsc()
-        
+    
     if site_rates_DB is None:
         site_rates_DB = site_rates
     else:
@@ -81,6 +85,15 @@ y = np.tile(site_rates_DB,[3,1])
 site_rates_DB = np.transpose(y).flatten()
 
 # Save database files
-np.save('occ_DB.npy', occ_DB.astype(int))       # make sure to store this as ints
-np.save('KMC_site_type_DB.npy', KMC_site_type_DB.astype(int))
-np.save('site_rates_DB.npy', site_rates_DB)
+np.save('data/occ_DB_' + str(n_seed) + '.npy', occ_DB.astype(int))       # make sure to store this as ints
+np.save('data/KMC_site_type_DB_' + str(n_seed) + '.npy', KMC_site_type_DB.astype(int))
+np.save('data/site_rates_DB_' + str(n_seed) + '.npy', site_rates_DB)
+
+## Load back the files to check them
+#x = np.load('occ_DB_1.npy')
+#y = np.load('KMC_site_type_DB_1.npy')
+#z = np.load('site_rates_DB_1.npy')
+#
+#print x.shape
+#print y.shape
+#print z.shape
