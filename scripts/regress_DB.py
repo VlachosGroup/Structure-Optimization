@@ -1,3 +1,5 @@
+#!/opt/shared/python/2.7.8-1/bin/python
+
 '''
 Read database and try to regress a surrogate model
 '''
@@ -13,6 +15,7 @@ import numpy as np
 import matplotlib as mat
 import matplotlib.pyplot as plt
 
+# Import sklearn classes
 from sklearn import tree
 from sklearn.neural_network import MLPClassifier
 from sklearn.neural_network import MLPRegressor
@@ -22,6 +25,14 @@ from sklearn.preprocessing import StandardScaler
 
 import OML
 
+# Get command line options
+import argparse
+parser = argparse.ArgumentParser(description='Analyze a database and do a machine learning fit')
+parser.add_argument('-l', action='store_true',help='Use local occupancies only')
+parser.add_argument('-w', action='store_true',help='Weight the data points')
+parser.add_argument('-z', action='store_true',help='Include sites with zero rate')
+args = parser.parse_args()
+raise NameError('stop')
 # Load database files - Needs to read it in a loop
 occ_DB_list = []
 KMC_site_type_DB_list = []
@@ -43,8 +54,9 @@ KMC_site_type_DB = np.vstack(KMC_site_type_DB_list)
 site_rates_DB = np.hstack(site_rates_DB_list)
     
 # Use only local occupancies
-cat = OML.LSC_cat()
-occ_DB = occ_DB[:,cat.get_local_inds()]
+if args.l:
+    cat = OML.LSC_cat()
+    occ_DB = occ_DB[:,cat.get_local_inds()]
 
 '''
 Shape the data for regression
@@ -70,10 +82,9 @@ for index in range(len(site_rates_DB)):
         site_is_active[index] = 1     # Classify rates as zero or nonzero
         n_active += 1
     else:
-        pass
-        # uncomment below to include zero-rate sites in the data set
-        #X_reg.append( occ_DB[index,:] )
-        #Y_reg.append( site_rates_DB[index] )
+        if args.l:
+            X_reg.append( occ_DB[index,:] )
+            Y_reg.append( site_rates_DB[index] )
         
 
 
@@ -86,11 +97,12 @@ Y_reg = np.array(Y_reg)
 
 # Assign weights to data points
 weights = np.ones_like(Y_reg)
-for index in range(len(Y_reg)):
-    if site_is_active[index] == 1:
-        weights[index] = float(ndp - n_active) / ndp
-    else:
-        weights[index] = float(n_active) / ndp
+if args.w:
+    for index in range(len(Y_reg)):
+        if site_is_active[index] == 1:
+            weights[index] = float(ndp - n_active) / ndp
+        else:
+            weights[index] = float(n_active) / ndp
 
 '''
 Regress nonzero site rates
@@ -211,7 +223,7 @@ par_min = min( all_point_values )
 par_max = max( all_point_values )
 plt.plot( [par_min, par_max], [par_min, par_max], '--', color = 'k')  # Can do this for all outputs
 plt.plot(y_train_raw, predictions_train, 'o', color = 'b', label = 'train')
-plt.plot(y_test_raw, predictions_test, 'o', color = 'r', label = 'test')
+plt.plot(y_test_raw, predictions_test, 'x', color = 'r', label = 'test')
 
 plt.xticks(size=18)
 plt.yticks(size=18)

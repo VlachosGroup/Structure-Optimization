@@ -279,9 +279,11 @@ class LSC_cat(dynamic_cat):
         kmc_lat.neighbor_list
         n_sites = len(kmc_lat.site_type_inds)
         
+        site_rates = np.zeros(len(self.variable_occs))
+        
         # If there are no sites
         if n_sites == 0:
-            return np.array([])
+            return site_rates
         
         A = np.zeros([n_sites,n_sites])
         b = np.zeros(n_sites)
@@ -308,8 +310,8 @@ class LSC_cat(dynamic_cat):
         theta = np.linalg.solve(A, b)
         kmc_site_rates = A_rate.dot(theta)
         
-        site_rates = np.zeros(len(self.variable_occs))
+        
         for i in range(len(kmc_site_rates)):
             site_rates[self.var_ind_kmc_sites[i]] = kmc_site_rates[i]
-            
+        
         return site_rates

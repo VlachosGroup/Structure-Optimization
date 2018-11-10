@@ -1,0 +1,41 @@
+# Energetics for steady state NH3 decomposition on Ni/Pt
+  
+energetics
+  
+############################################################################
+  
+cluster A_point
+  
+  sites 1
+  lattice_state
+    1 A*  1
+  
+  variant top_Ni
+    site_types          top_Ni
+    graph_multiplicity  1
+    cluster_eng         0.0  #with ZPE
+  end_variant
+  
+end_cluster
+
+############################################################################
+  
+cluster B_point
+  
+  sites 1
+  lattice_state
+    1 B*  1
+  
+  variant top_edge_Ni
+    site_types          top_edge_Ni
+    graph_multiplicity  1
+    cluster_eng         0.0  #with ZPE
+  end_variant
+  
+  
+end_cluster
+
+############################################################################
+############################################################################
+
+end_energetics

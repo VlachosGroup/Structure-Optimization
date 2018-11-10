@@ -17,8 +17,10 @@ import random
 import zacros_wrapper as zw
 import OML
 
-n_seed = int(sys.argv[1])
-random.seed(a=n_seed)
+# User can specify a seed from the command line
+if len(sys.argv) > 1:
+    n_seed = int(sys.argv[1])
+    random.seed(a=n_seed)
 n_structure = 100
 #n_structure = 2            # for debugging
 
