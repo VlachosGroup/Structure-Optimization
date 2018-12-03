@@ -124,7 +124,7 @@ def make_random_structure(i, n_strucs, cat, fldr_name):
     write_structure_files(cat, fldr_name)
     
     
-if __name__ == '__main__': 
+def main():
     
     ''' User input '''
     n_strucs = 48
@@ -165,3 +165,6 @@ if __name__ == '__main__':
     for job in jobs:
         fldr_name = os.path.join(DB_fldr, 'structure_' + str(job+1) )
         make_random_structure(job, n_strucs, cat, fldr_name)
+		
+if __name__ == '__main__': 
+	main()

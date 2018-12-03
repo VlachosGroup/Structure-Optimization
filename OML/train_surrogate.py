@@ -28,7 +28,7 @@ class surrogate(object):
         self.Y_reg = None                   # Site rates used in the regression
         self.site_is_active = None          # 0 for inactive sites and 1 for active sites
         
-        self.Y_scaler = None
+        Y_scaler = None
         
     
     def eval_structure_rate(self, all_trans, normalize = False):
@@ -47,7 +47,7 @@ class surrogate(object):
         if active_site_list == []:
             return 0
         else:
-            site_rates = self.Y_scaler.inverse_transform( self.predictor.predict( all_trans[active_site_list,:] ) )
+            site_rates = Y_scaler.inverse_transform( self.predictor.predict( all_trans[active_site_list,:] ) )
             if normalize:
                 return np.sum( site_rates ) / len(all_trans)
             else:
@@ -96,9 +96,6 @@ class surrogate(object):
     
         self.X_reg = np.array(self.X_reg)
         self.Y_reg = np.array(self.Y_reg)
-        print self.X_reg.shape
-        print self.Y_reg.shape
-        #raise NameError('stop')
     
     
     def train_classifier(self):    
@@ -109,12 +106,6 @@ class surrogate(object):
         :param self.all_syms: All permutations of input structures
         :param self.site_is_active: 0 if inactive, 1 if active
         '''
-        
-        #self.classifier = tree.DecisionTreeClassifier(max_leaf_nodes=50)
-        #self.classifier.fit(self.all_syms, self.site_is_active)
-        #predictoriction_train = self.classifier.predict(self.all_syms)
-        #frac_wrong_train = np.float( np.sum( np.abs( predictoriction_train - self.site_is_active ) ) ) / len(self.site_is_active)
-        #print 'Fraction wrong in training set: ' + str(frac_wrong_train)
         
         # Use this section for choosing hyperparameters
         self.classifier = tree.DecisionTreeClassifier(max_depth=30, random_state=0)
@@ -128,19 +119,6 @@ class surrogate(object):
         frac_wrong_test = np.float( np.sum( np.abs( predictoriction_test - y_test ) ) ) / len(y_test)
         print 'Fraction wrong in test set: ' + str(frac_wrong_test)
         print 'Fraction in training set: ' + str(np.float(len(y_train)) / (len(y_test) + len(y_train)))
-        
-        n_nodes = self.classifier.tree_.node_count
-        children_left = self.classifier.tree_.children_left
-        children_right = self.classifier.tree_.children_right
-        feature = self.classifier.tree_.feature
-        threshold = self.classifier.tree_.threshold
-        
-        #print n_nodes
-        #print children_left
-        #print children_right
-        #print feature
-        #print threshold
-        raise NameError('stop')
         
         
     
@@ -158,82 +136,25 @@ class surrogate(object):
         plt.tight_layout()
         plt.savefig('site_rate_hist')
         plt.close()
-        #raise NameError('stop')
+
         # Scale Y
-        self.Y_scaler = StandardScaler(with_mean = True, with_std = True)
-        self.Y_scaler.fit(self.Y_reg.reshape(-1,1))
-        Y = self.Y_scaler.transform(self.Y_reg.reshape(-1,1))
+        Y_scaler = StandardScaler(with_mean = True, with_std = True)
+        Y_scaler.fit(self.Y_reg.reshape(-1,1))
+        Y = Y_scaler.transform(self.Y_reg.reshape(-1,1))
         Y = Y.flatten()
         
         '''
         Train neural network - Regression
         '''
         
-        #self.predictor = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.0001,
-        #                alpha = 0.1, hidden_layer_sizes = (20,), max_iter=10000, tol=0.00001)                
-        #self.predictor.fit(self.X_reg, Y)
-        #predictions = self.Y_scaler.inverse_transform( self.predictor.predict(self.X_reg) )
-        #mae = np.mean( np.abs( predictions - self.Y_reg ) )
-        #
-        #print 'Mean y: ' + str(np.mean(self.Y_reg))
-        #print 'Mean absolute error: ' + str(mae)
+        self.predictor = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.0001,
+                        alpha = 0.1, hidden_layer_sizes = (20,), max_iter=10000, tol=0.00001)                
+        self.predictor.fit(self.X_reg, Y)
+        predictions = Y_scaler.inverse_transform( self.predictor.predict(self.X_reg) )
+        mae = np.mean( np.abs( predictions - self.Y_reg ) )
         
-        # Use this section for choosing hyperparameters
-        print self.X_reg
-        self.predictor = MLPRegressor(activation = 'relu', verbose=True, learning_rate_init=0.0001, momentum=0.7,
-                        alpha = 1.0, hidden_layer_sizes = (20,), max_iter=10000, tol=0.000001)
-        #self.predictor = tree.DecisionTreeRegressor(max_depth=10)
-        X_train, X_test, y_train, y_test = train_test_split(self.X_reg, Y, random_state=0)
-        y_train_raw = self.Y_scaler.inverse_transform(y_train)
-        y_test_raw = self.Y_scaler.inverse_transform(y_test)
-        self.predictor.fit(X_train, y_train)
         print 'Mean y: ' + str(np.mean(self.Y_reg))
-        predictions_train = self.Y_scaler.inverse_transform( self.predictor.predict(X_train) )
-        predictions_train = predictions_train.reshape(-1)
-        y_train_raw = y_train_raw.reshape(-1)
-        mae = np.mean( np.abs( predictions_train - y_train_raw ) )
-        print 'Mean absolute error (train): ' + str(mae)
-        predictions_test = self.Y_scaler.inverse_transform( self.predictor.predict(X_test) )
-        predictions_test = predictions_test.reshape(-1)
-        y_test_raw = y_test_raw.reshape(-1)
-        mae = np.mean( np.abs( predictions_test - y_test_raw ) )
-        print 'Mean absolute error (test): ' + str(mae)
-        
-        print str(len(y_train_raw)) + ' data points in training set'
-        print str(len(y_test_raw)) + ' data points in test set'
-        
-        # Print information
-        #print dtr.tree_.node_count
-        #print dtr.tree_.children_left
-        #print dtr.tree_.children_right
-        #print dtr.tree_.feature
-        #print dtr.tree_.threshold
-        
-        mat.rcParams['mathtext.default'] = 'regular'
-        mat.rcParams['text.latex.unicode'] = 'False'
-        mat.rcParams['legend.numpoints'] = 1
-        mat.rcParams['lines.linewidth'] = 2
-        mat.rcParams['lines.markersize'] = 12
-        
-        plt.figure()
-        all_point_values = np.hstack([y_train_raw, y_test_raw, predictions_train, predictions_test])
-        par_min = min( all_point_values )
-        par_max = max( all_point_values )
-        plt.plot( [par_min, par_max], [par_min, par_max], '--', color = 'k')  # Can do this for all outputs
-        plt.plot(y_train_raw, predictions_train, 'o', color = 'b', label = 'train')
-        plt.plot(y_test_raw, predictions_test, 'o', color = 'r', label = 'test')
-        
-        plt.xticks(size=18)
-        plt.yticks(size=18)
-        plt.xlabel('Kinetic Monte Carlo', size=24)
-        plt.ylabel('Neural network', size=24)
-        plt.legend(loc=4, prop={'size':20}, frameon=False)
-        plt.tight_layout()
-        plt.savefig('hyper_fit', dpi = 600)
-        plt.close()
-        
-        raise NameError('stop')
-        
+        print 'Mean absolute error: ' + str(mae)
         
         '''
         Parity plot for the neural network fit

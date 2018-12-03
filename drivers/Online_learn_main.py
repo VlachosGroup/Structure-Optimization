@@ -17,7 +17,7 @@ from mpi4py import MPI      # MPI parallelization
 
 import zacros_wrapper as zw
 from OML.NiPt_NH3 import *
-from OML.toy_cat import *
+from OML.LSC_cat import *
 from OML.KMC_handler import *
 from OML.train_surrogate import *
 from OML.optimize_SA import *
@@ -85,7 +85,9 @@ def plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN, structure_ra
     plt.close()
         
     
-if __name__ == '__main__':
+
+
+def main():
 
     '''
     User input
@@ -96,11 +98,11 @@ if __name__ == '__main__':
     max_iterations = 10         # Maximum number of iterations for the online machine learning
     
     # Directories
-    main_fldr = '/home/vlachos/mpnunez/OML_data/NH3_lumped_2'
+    main_fldr = '/home/vlachos/mpnunez/OML_data/AB_data_3'
     DB_fldr = os.path.join(main_fldr, 'KMC_DB')
     kmc_input_fldr = os.path.join(main_fldr, 'KMC_input')
     exe_file = '/home/vlachos/mpnunez/bin/zacros_ML.x'
-    structure_proc = NiPt_NH3()                     # structure for this processor
+    structure_proc = LSC_cat()                     # structure for this processor
 
     # Run in parallel
     COMM = MPI.COMM_WORLD
@@ -192,14 +194,14 @@ if __name__ == '__main__':
         Run KMC and compute site rates
         '''
         
-        cum_reps = steady_state_rescale(kmc_input_fldr, curr_fldr, exe_file, 'N2', n_runs = 5, n_batches = 1000, 
+        cum_reps = steady_state_rescale(kmc_input_fldr, curr_fldr, exe_file, 'B', n_runs = 5, n_batches = 1000, 
                             prod_cut = 500, include_stiff_reduc = True, max_events = int(1e3), 
                             max_iterations = 10, ss_inc = 1.0, n_samples = 100,
                             rate_tol = 0.05, j_name = 'struc_' + str(iteration) + '_' + str(COMM.rank) )
         
         cum_reps.runAvg.lat.Read_lattice_output( os.path.join(curr_fldr,'Iteration_1','1') )            
         cum_reps.AverageRuns()
-        site_rates_onestruc = compute_site_rates(structure_proc, cum_reps.runAvg, gas_prod = 'N2', gas_stoich = 1)
+        site_rates_onestruc = compute_site_rates(structure_proc, cum_reps.runAvg, gas_prod = 'B', gas_stoich = 1)
         np.save(os.path.join(curr_fldr, 'site_rates.npy'), site_rates_onestruc)
                 
     
@@ -228,3 +230,6 @@ if __name__ == '__main__':
         plot_parity(curr_fldr, structure_rates_KMC, structure_rates_NN, structure_rates_KMC_new = structure_rates_KMC_new, predicted_activities = predicted_activities)
         
         # Terminate if the KMC is the best it has ever been and was accurately predicted by the surrogate
+		
+if __name__ == '__main__':
+	main()

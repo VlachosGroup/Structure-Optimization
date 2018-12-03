@@ -25,7 +25,7 @@ from OML.train_surrogate import *
 from OML.optimize_SA import *
 
 
-if __name__ == '__main__': 
+main()
     
     ''' User input '''
     n_strucs = 48
@@ -68,3 +68,6 @@ if __name__ == '__main__':
         cum_reps.AverageRuns()
         site_rates = compute_site_rates(cat, cum_reps.runAvg, gas_prod = 'N2', gas_stoich = 1)
         np.save(os.path.join(job, 'site_rates.npy'), site_rates)
+		
+if __name__ == '__main__': 
+	main()

@@ -371,6 +371,6 @@ def compute_site_rates(cat, avg_traj, gas_prod = 'N2', gas_stoich = 1):
     
     site_rates = np.matmul( site_props_ss, TOF_stoich ) / gas_stoich
     
-    site_types_all_syms = cat.generate_all_translations_and_rotations(old_vec = site_types)
+    site_types_all_syms = cat.generate_all_translations_and_rotations()
     
     return site_rates, site_types_all_syms
