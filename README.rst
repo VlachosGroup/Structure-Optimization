@@ -12,7 +12,7 @@ Dependencies
 
 Publications
 -------------
-* M. Núñez and D.G Vlachos, “Multiscale Modeling Combined with Active Learning for Microstructure Optimization of Bifunctional Catalysts” Industrial and Engineering Chemistry Research 58(15), 6146 (2019).
+* `M. Núñez and D.G Vlachos, “Multiscale Modeling Combined with Active Learning for Microstructure Optimization of Bifunctional Catalysts” Industrial and Engineering Chemistry Research 58(15), 6146 (2019). <https://pubs.acs.org/doi/abs/10.1021/acs.iecr.8b04801>`_ 
 
 Developers
 -----------
